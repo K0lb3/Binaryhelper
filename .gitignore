@@ -1,0 +1,18 @@
+# Test & Dev environments
+old/
+test*.py
+
+# Python-generated files
+__pycache__/
+.pytest_cache/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+*.pyd
+*.so
+
+# Virtual environments
+.venv
+.vscode
