@@ -7,45 +7,10 @@
 #include "structmember.h"
 
 #include "PyConverter.hpp"
+#include "EndianedIOBase.hpp"
 #include <algorithm>
 
 // 'align'
-
-// 'close'
-// 'closed'
-// 'detach'
-
-// 'fileno'
-// 'flush'
-
-// 'isatty'
-
-// 'truncate'
-
-// 'read'
-// 'read1'
-
-// 'readinto'
-// 'readinto1'
-// 'readline'
-// 'readlines'
-
-// 'write'
-// 'writelines'
-
-// 'read_count'
-
-// 'write_f16'
-// 'write_f32'
-// 'write_f64'
-// 'write_i16'
-// 'write_i32'
-// 'write_i64'
-// 'write_i8'
-// 'write_u16'
-// 'write_u32'
-// 'write_u64'
-// 'write_u8'
 
 PyObject *EndianedStreamIO_OT = nullptr;
 
@@ -65,6 +30,10 @@ typedef struct
     PyObject *seekable;
     PyObject *isatty;
     PyObject *truncate;
+    PyObject *readinto;
+    PyObject *readline;
+    PyObject *readlines;
+    PyObject *fileno;
 } EndianedStreamIO;
 
 #define IF_NOT_NULL_UNREF(obj) \
@@ -88,6 +57,10 @@ void EndianedStreamIO_dealloc(EndianedStreamIO *self)
     IF_NOT_NULL_UNREF(self->seekable);
     IF_NOT_NULL_UNREF(self->isatty);
     IF_NOT_NULL_UNREF(self->truncate);
+    IF_NOT_NULL_UNREF(self->readinto);
+    IF_NOT_NULL_UNREF(self->readline);
+    IF_NOT_NULL_UNREF(self->readlines);
+    IF_NOT_NULL_UNREF(self->fileno);
 
     PyObject_Del((PyObject *)self);
 }
@@ -130,6 +103,10 @@ int EndianedStreamIO_init(EndianedStreamIO *self, PyObject *args, PyObject *kwds
     self->seekable = PyObject_GetAttrString(self->stream, "seekable");
     self->isatty = PyObject_GetAttrString(self->stream, "isatty");
     self->truncate = PyObject_GetAttrString(self->stream, "truncate");
+    self->readinto = PyObject_GetAttrString(self->stream, "readinto");
+    self->readline = PyObject_GetAttrString(self->stream, "readline");
+    self->readlines = PyObject_GetAttrString(self->stream, "readlines");
+    self->fileno = PyObject_GetAttrString(self->stream, "fileno");
     return 0;
 };
 
@@ -147,8 +124,54 @@ PyMemberDef EndianedStreamIO_members[] = {
     {"seekable", T_OBJECT_EX, offsetof(EndianedStreamIO, seekable), Py_READONLY, "seekable"},
     {"isatty", T_OBJECT_EX, offsetof(EndianedStreamIO, isatty), Py_READONLY, "isatty"},
     {"truncate", T_OBJECT_EX, offsetof(EndianedStreamIO, truncate), Py_READONLY, "truncate"},
+    {"readinto", T_OBJECT_EX, offsetof(EndianedStreamIO, readinto), Py_READONLY, "readinto"},
+    {"readline", T_OBJECT_EX, offsetof(EndianedStreamIO, readline), Py_READONLY, "readline"},
+    {"readlines", T_OBJECT_EX, offsetof(EndianedStreamIO, readlines), Py_READONLY, "readlines"},
+    {"fileno", T_OBJECT_EX, offsetof(EndianedStreamIO, fileno), Py_READONLY, "fileno"},
     {NULL} /* Sentinel */
 };
+
+PyObject *EndianedIOBase_get_closed(EndianedStreamIO *self, void *closure)
+{
+    if (self->stream == nullptr)
+    {
+        Py_RETURN_TRUE;
+    }
+    return PyObject_CallMethod(self->stream, "closed", nullptr);
+}
+
+PyGetSetDef EndianedStreamIO_getseters[] = {
+    {"closed", (getter)EndianedIOBase_get_closed, nullptr, "closed", nullptr},
+    {nullptr} /* Sentinel */
+};
+
+inline PyObject *_read_buffer(EndianedStreamIO *self, const Py_ssize_t size)
+{
+    PyObject *py_size = PyLong_FromSsize_t(size);
+    PyObject *buffer = PyObject_CallFunctionObjArgs(
+        self->read,
+        py_size,
+        nullptr);
+    Py_DecRef(py_size);
+
+    if (buffer == nullptr)
+    {
+        return nullptr;
+    }
+    Py_ssize_t check_res = PyBytes_Size(buffer);
+    if (check_res < 0)
+    {
+        return nullptr;
+    }
+    else if (check_res != size)
+    {
+        PyErr_Format(PyExc_ValueError, "Buffer size mismatch: expected %zu, got %d", size, check_res);
+        Py_DecRef(buffer);
+        return nullptr;
+    }
+
+    return buffer;
+}
 
 template <typename T, char endian>
     requires(
@@ -156,26 +179,9 @@ template <typename T, char endian>
         (endian == '<' || endian == '>' || endian == '|'))
 static PyObject *EndianedStreamIO_read_t(EndianedStreamIO *self, PyObject *args)
 {
-    PyObject *py_size = PyLong_FromSsize_t(sizeof(T));
-    PyObject *buffer = PyObject_CallFunctionObjArgs(
-        self->read,
-        py_size,
-        nullptr);
-    Py_DECREF(py_size);
-
+    PyObject *buffer = _read_buffer(self, sizeof(T));
     if (buffer == nullptr)
     {
-        return nullptr;
-    }
-    int check_res = PyBytes_Size(buffer);
-    if (check_res < 0)
-    {
-        return nullptr;
-    }
-    else if (check_res != sizeof(T))
-    {
-        PyErr_Format(PyExc_ValueError, "Buffer size mismatch: expected %zu, got %d", sizeof(T), check_res);
-        Py_DecRef(buffer);
         return nullptr;
     }
 
@@ -183,20 +189,19 @@ static PyObject *EndianedStreamIO_read_t(EndianedStreamIO *self, PyObject *args)
 
     // Read the data from the buffer
     memcpy(&value, PyBytes_AsString(buffer), sizeof(T));
-    Py_DECREF(buffer);
+    Py_DecRef(buffer);
 
-    constexpr bool kBigEndianSystem = (std::endian::native == std::endian::big);
-    if constexpr ((endian == '<') && kBigEndianSystem)
+    if constexpr ((endian == '<') && IS_BIG_ENDIAN_SYSTEM)
     {
         value = byteswap(value);
     }
-    else if constexpr ((endian == '>') && !kBigEndianSystem)
+    else if constexpr ((endian == '>') && !IS_BIG_ENDIAN_SYSTEM)
     {
         value = byteswap(value);
     }
-    else if constexpr(sizeof(T) != 1)
+    else if constexpr (sizeof(T) != 1)
     {
-        if constexpr (kBigEndianSystem)
+        if constexpr (IS_BIG_ENDIAN_SYSTEM)
         {
             if (self->endian == '<')
             {
@@ -215,57 +220,179 @@ static PyObject *EndianedStreamIO_read_t(EndianedStreamIO *self, PyObject *args)
     return PyObject_FromAny(value);
 }
 
+template <typename T, char endian>
+    requires(
+        EndianedReadable<T> &&
+        (endian == '<' || endian == '>' || endian == '|'))
+static PyObject *EndianedStreamIO_read_array_t(EndianedStreamIO *self, PyObject *arg)
+{
+    Py_ssize_t size = 0;
+    if (arg == Py_None)
+    {
+        PyObject *count_py = PyObject_CallMethod(
+            reinterpret_cast<PyObject *>(self),
+            "read_count",
+            "",
+            nullptr);
+        if (count_py == nullptr)
+        {
+            return nullptr;
+        }
+        if (!PyLong_Check(count_py))
+        {
+            PyErr_SetString(PyExc_TypeError, "read_count didn't return an integer.");
+            Py_DecRef(count_py);
+            return nullptr;
+        }
+        size = PyLong_AsSsize_t(count_py);
+        Py_DecRef(count_py);
+    }
+    else if (PyLong_Check(arg))
+    {
+        size = PyLong_AsSsize_t(arg);
+        if (size < 0)
+        {
+            PyErr_SetString(PyExc_ValueError, "Invalid size argument.");
+            return nullptr;
+        }
+    }
+    else
+    {
+        PyErr_SetString(PyExc_TypeError, "Argument must be an integer or None.");
+        return nullptr;
+    }
+
+    PyObject *buffer = _read_buffer(self, sizeof(T) * size);
+    if (buffer == nullptr)
+    {
+        return nullptr;
+    }
+
+    // Read the data from the buffer
+    T *data = reinterpret_cast<T *>(PyBytes_AsString(buffer));
+    if (data == nullptr)
+    {
+        Py_DecRef(buffer);
+        return nullptr;
+    }
+    PyObject *ret = PyTuple_New(size);
+
+    for (Py_ssize_t i = 0; i < size; ++i)
+    {
+
+        T value = data[i];
+        data += 1;
+
+        if constexpr ((endian == '<') && IS_BIG_ENDIAN_SYSTEM)
+        {
+            value = byteswap(value);
+        }
+        else if constexpr ((endian == '>') && !IS_BIG_ENDIAN_SYSTEM)
+        {
+            value = byteswap(value);
+        }
+        else if constexpr (sizeof(T) != 1)
+        {
+            if constexpr (IS_BIG_ENDIAN_SYSTEM)
+            {
+                if (self->endian == '<')
+                {
+                    value = byteswap(value);
+                }
+            }
+            else
+            {
+                if (self->endian == '>')
+                {
+                    value = byteswap(value);
+                }
+            }
+        }
+
+        PyObject *item = PyObject_FromAny(value);
+        if (item == nullptr)
+        {
+            Py_DecRef(ret);
+            Py_DecRef(buffer);
+            return nullptr;
+        }
+        PyTuple_SetItem(ret, i, item); // Steal reference, no need to DECREF
+    }
+
+    Py_DecRef(buffer);
+    return ret;
+}
+
+PyObject *EndianedStreamIO_align(EndianedStreamIO *self, PyObject *arg)
+{
+    Py_ssize_t size;
+    CHECK_SIZE_ARG(arg, size, 4)
+    if (size <= 0)
+    {
+        PyErr_SetString(PyExc_ValueError, "Invalid size argument.");
+        return nullptr;
+    }
+    PyObject *pos = PyObject_CallFunctionObjArgs(
+        self->tell,
+        nullptr);
+    if (pos == nullptr)
+    {
+        return nullptr;
+    }
+    Py_ssize_t current_pos = PyLong_AsSsize_t(pos);
+    Py_DecRef(pos);
+    Py_ssize_t pad = size - (current_pos % size);
+    if (pad != size)
+    {
+        current_pos += pad;
+        PyObject *new_pos = PyLong_FromSsize_t(current_pos);
+        if (new_pos == nullptr)
+        {
+            return nullptr;
+        }
+        PyObject *seek_result = PyObject_CallFunctionObjArgs(
+            self->seek,
+            new_pos,
+            nullptr);
+        Py_DecRef(new_pos);
+        if (seek_result == nullptr)
+        {
+            return nullptr;
+        }
+        return seek_result;
+    }
+    return PyLong_FromSsize_t(current_pos);
+}
+
 PyMethodDef EndianedStreamIO_methods[] = {
-    {"read_u8", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint8_t, '|'>), METH_NOARGS, "Read a uint8_t value."},
-    {"read_u16", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint16_t, '|'>), METH_NOARGS, "Read a uint16_t value."},
-    {"read_u32", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint32_t, '|'>), METH_NOARGS, "Read a uint32_t value."},
-    {"read_u64", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint64_t, '|'>), METH_NOARGS, "Read a uint64_t value."},
-    {"read_i8", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int8_t, '|'>), METH_NOARGS, "Read an int8_t value."},
-    {"read_i16", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int16_t, '|'>), METH_NOARGS, "Read an int16_t value."},
-    {"read_i32", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int32_t, '|'>), METH_NOARGS, "Read an int32_t value."},
-    {"read_i64", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int64_t, '|'>), METH_NOARGS, "Read an int64_t value."},
-    {"read_f16", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<half, '|'>), METH_NOARGS, "Read a half value."},
-    {"read_f32", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<float, '|'>), METH_NOARGS, "Read a float value."},
-    {"read_f64", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<double, '|'>), METH_NOARGS, "Read a double value."},
-    // low endian
-    {"read_u8_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint8_t, '<'>), METH_NOARGS, "Read a uint8_t value."},
-    {"read_u16_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint16_t, '<'>), METH_NOARGS, "Read a uint16_t value."},
-    {"read_u32_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint32_t, '<'>), METH_NOARGS, "Read a uint32_t value."},
-    {"read_u64_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint64_t, '<'>), METH_NOARGS, "Read a uint64_t value."},
-    {"read_i8_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int8_t, '<'>), METH_NOARGS, "Read an int8_t value."},
-    {"read_i16_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int16_t, '<'>), METH_NOARGS, "Read an int16_t value."},
-    {"read_i32_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int32_t, '<'>), METH_NOARGS, "Read an int32_t value."},
-    {"read_i64_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int64_t, '<'>), METH_NOARGS, "Read an int64_t value."},
-    {"read_f16_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<half, '<'>), METH_NOARGS, "Read a half value."},
-    {"read_f32_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<float, '<'>), METH_NOARGS, "Read a float value."},
-    {"read_f64_le", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<double, '<'>), METH_NOARGS, "Read a double value."},
-    // big endian
-    {"read_u8_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint8_t, '>'>), METH_NOARGS, "Read a uint8_t value."},
-    {"read_u16_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint16_t, '>'>), METH_NOARGS, "Read a uint16_t value."},
-    {"read_u32_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint32_t, '>'>), METH_NOARGS, "Read a uint32_t value."},
-    {"read_u64_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<uint64_t, '>'>), METH_NOARGS, "Read a uint64_t value."},
-    {"read_i8_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int8_t, '>'>), METH_NOARGS, "Read an int8_t value."},
-    {"read_i16_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int16_t, '>'>), METH_NOARGS, "Read an int16_t value."},
-    {"read_i32_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int32_t, '>'>), METH_NOARGS, "Read an int32_t value."},
-    {"read_i64_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<int64_t, '>'>), METH_NOARGS, "Read an int64_t value."},
-    {"read_f16_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<half, '>'>), METH_NOARGS, "Read a half value."},
-    {"read_f32_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<float, '>'>), METH_NOARGS, "Read a float value."},
-    {"read_f64_be", reinterpret_cast<PyCFunction>(EndianedStreamIO_read_t<double, '>'>), METH_NOARGS, "Read a double value."},
+    GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS(EndianedStreamIO_read_t),
+    GENERATE_ENDIANEDIOBASE_READ_ARRAY_FUNCTIONS(EndianedStreamIO_read_array_t),
+    {"align",
+     (PyCFunction)EndianedStreamIO_align,
+     METH_O,
+     "Align the stream to the specified size."},
     {NULL} /* Sentinel */
 };
 
-PyObject *
-EndianedStreamIO_repr(PyObject *self)
+PyObject *EndianedStreamIO_repr(PyObject *self)
 {
     EndianedStreamIO *node = (EndianedStreamIO *)self;
-    return PyUnicode_FromFormat(
-        "<EndianedStreamIOC (w:%d, h:%d, s:%d)>",
-        1, 2, 3
-        // node->obj->__repr__(node->obj),
-        // node->surf.width,
-        // node->surf.height,
-        // node->surf.stride
-    );
+
+    // Get stream representation
+    PyObject *stream_repr = PyObject_Repr(node->stream);
+    if (stream_repr == NULL)
+    {
+        stream_repr = PyUnicode_FromString("None");
+    }
+
+    // Create our repr string
+    PyObject *result = PyUnicode_FromFormat(
+        "<EndianedStreamIO endian='%c' stream=%U>",
+        node->endian,
+        stream_repr);
+
+    Py_DECREF(stream_repr);
+    return result;
 }
 
 PyType_Slot EndianedStreamIO_slots[] = {

@@ -12,6 +12,9 @@
 #include <cstdint>
 #include <Python.h>
 
+
+constexpr bool IS_BIG_ENDIAN_SYSTEM = (std::endian::native == std::endian::big);
+
 /**
  * @brief Type definition for half-precision (16-bit) floating point values.
  *
@@ -23,8 +26,12 @@ struct half
 };
 
 template <class _Ty>
-    requires std::is_integral_v<_Ty> || std::is_floating_point_v<_Ty> || std::is_same_v<_Ty, half>
-_NODISCARD constexpr _Ty byteswap(const _Ty _Val) noexcept
+    requires 
+        std::is_integral_v<_Ty> || 
+        std::is_floating_point_v<_Ty> || 
+        std::is_same_v<_Ty, half> ||
+        std::is_trivially_copyable_v<_Ty>
+constexpr _Ty byteswap(const _Ty _Val) noexcept
 {
     if constexpr (std::is_integral_v<_Ty>)
     {
@@ -44,7 +51,7 @@ _NODISCARD constexpr _Ty byteswap(const _Ty _Val) noexcept
     }
     else
     {
-        _STL_INTERNAL_STATIC_ASSERT(false); // unexpected size
+        static_assert(sizeof(_Ty) == 2 || sizeof(_Ty) == 4 || sizeof(_Ty) == 8, "Unsupported type size for byteswap.");
     }
 }
 
