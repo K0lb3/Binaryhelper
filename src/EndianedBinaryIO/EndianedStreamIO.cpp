@@ -391,7 +391,7 @@ PyObject *EndianedStreamIO_repr(PyObject *self)
         node->endian,
         stream_repr);
 
-    Py_DECREF(stream_repr);
+    Py_DecRef(stream_repr);
     return result;
 }
 
