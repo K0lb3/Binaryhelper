@@ -77,9 +77,28 @@ class BinarySerializableOptions:
 class BinarySerializableOption(metaclass=ABCMeta): ...
 
 
+type member[TType] = TType  # TODO: Implement member-only serialization behavior
+"""
+Used for defining the members to serialize when not all class members should be serialized.
+"""
+
+type custom[TType, *TOptions] = Annotated[TType, *TOptions]
+"""
+Used for overriding type-level serialization settings for a given member.
+"""
+
 type AllowedLengthTypes = i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64
-type length_type[T: AllowedLengthTypes] = BinarySerializableOption
-type member[TType, *TOptions] = Annotated[TType, *TOptions]
+type length_type[T: int | TypeNode[int]] = BinarySerializableOption
+"""
+Used for specifying the type to use when reading a length-providing field.
+Must be serializing an 'int' type.
+"""
+
+default_length_encoding = length_type
+"""
+Used for specifying the default type to use when reading a length-providing field.
+Must be serializing an 'int' type.
+"""
 
 
 def get_origin_type(cls: type) -> type:
@@ -138,7 +157,7 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
             tuple(parse_annotation(annotation=arg, options=options) for arg in args)
         )
 
-    if origin is member:
+    if origin is custom:
         assert len(args) >= 1, "member must have at least one argument"
         member_type = args[0]
         member_options = replace(options)
@@ -146,6 +165,10 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
             member_options = parse_option(option, member_options)
 
         return parse_annotation(member_type, member_options)
+
+    if origin is member:
+        assert len(args) == 1, "member must have one argument"
+        return parse_annotation(args[0], options)
 
     if origin is Annotated:
         for arg in args:
@@ -218,4 +241,10 @@ def build_type_node[T: BinarySerializable](cls: type[T]) -> ClassNode[T]:
     )
 
 
-__all__ = ("BinarySerializable", "length_type", "member")
+__all__ = (
+    "BinarySerializable",
+    "length_type",
+    "member",
+    "default_length_encoding",
+    "custom",
+)

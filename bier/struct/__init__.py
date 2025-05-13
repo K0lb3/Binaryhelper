@@ -1,4 +1,10 @@
-from .BinarySerializable import BinarySerializable, length_type, member
+from .BinarySerializable import (
+    BinarySerializable,
+    length_type,
+    member,
+    default_length_encoding,
+    custom,
+)
 from .TypeNode import (
     ClassNode,
     ListNode,
