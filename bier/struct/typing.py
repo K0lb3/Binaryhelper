@@ -8,7 +8,6 @@ from .TypeNode import (
     I16Node,
     I32Node,
     I64Node,
-    ListNode,
     StringNode,
     U8Node,
     U16Node,
@@ -34,8 +33,6 @@ f32 = Annotated[float, F32Node]
 f64 = Annotated[float, F64Node]
 
 cstr = Annotated[str, StringNode, None]
-type str_d[T: int] = Annotated[str, StringNode, T]
-type list_d[S, T: int] = Annotated[list[S], ListNode, T]
 
 __all__ = (
     "u8",
@@ -50,6 +47,4 @@ __all__ = (
     "f32",
     "f64",
     "cstr",
-    "str_d",
-    "list_d",
 )

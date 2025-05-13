@@ -1,12 +1,12 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from inspect import isclass
+from functools import cache
+from types import get_original_bases
+from abc import ABCMeta
 from typing import (
     Annotated,
     Any,
-    Generic,
     Self,
-    Type,
-    TypeVar,
     get_args,
     get_origin,
     get_type_hints,
@@ -31,15 +31,11 @@ from .typing import (
     i16,
     i32,
     i64,
-    list_d,
-    str_d,
     u8,
     u16,
     u32,
     u64,
 )
-
-T = TypeVar("T")
 
 PRIMITIVES = (
     u8,
@@ -54,40 +50,12 @@ PRIMITIVES = (
     f32,
     f64,
 )
-NODE_MAPS: dict[Type[object], ClassNode] = {}
 
 
-class BinarySerializable(Serializable, Generic[T]):
+class BinarySerializable[*TOptions](Serializable):
     @classmethod
     def _get_node(cls) -> ClassNode[Self]:
-        if cls in NODE_MAPS:
-            return NODE_MAPS[cls]
-
-        type_hints = get_type_hints(cls, include_extras=True)
-
-        # get default length encoding from the class
-        length_encoding = U32Node()
-        for base in getattr(cls, "__orig_bases__", ()):
-            if get_origin(base) is BinarySerializable:
-                args = get_args(base)
-                if len(args) == 1:
-                    try:
-                        length_encoding = parse_annotated_length(args[0])
-                        break
-                    except Exception:
-                        pass
-        options = BinarySerializableOptions(length_encoding)
-
-        names = tuple(type_hints.keys())
-        nodes = tuple(
-            parse_annotation(annotation, options) for annotation in type_hints.values()
-        )
-
-        return ClassNode(
-            names=names,
-            nodes=nodes,
-            call=cls.from_parsed_dict,
-        )
+        return build_type_node(cls)
 
     @classmethod
     def from_parsed_dict(cls, parsed_dict: dict[str, Any]) -> Self:
@@ -106,26 +74,41 @@ class BinarySerializableOptions:
     default_length_encoding: TypeNode[int] = U32Node()
 
 
-def parse_annotated_length(annotation: Annotated) -> TypeNode[int]:
+class BinarySerializableOption(metaclass=ABCMeta): ...
+
+
+type AllowedLengthTypes = i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64
+type default_length_encoding[T: AllowedLengthTypes] = BinarySerializableOption
+type member[TType, *TOptions] = Annotated[TType, *TOptions]
+
+
+def get_origin_type(cls: type) -> type:
+    return get_origin(cls) or cls
+
+
+def get_binary_serializable_spec(cls: type[BinarySerializable]) -> Any:
+    for base in get_original_bases(cls):
+        if get_origin_type(base) is BinarySerializable:
+            return base
+
+    raise ValueError(f"Type {cls} does not inherit from BinarySerializable")
+
+
+def parse_length_type(annotation: Annotated) -> TypeNode[int]:
     args = get_args(annotation)
-    assert len(args) >= 2, "Annotated length must have two arguments"
-    assert args[0] is int, "Annotated length must be an int"
+    assert len(args) >= 2, "Length type must have two arguments"
+    assert args[0] is int, "Length type must be an int"
     if issubclass(args[1], TypeNode):
         return args[1]()
     elif isinstance(args[1], TypeNode):
         return args[1]
     else:
         raise ValueError(
-            f"Annotated length must be a TypeNode[int] or an instance of it, got {args[1]} instead."
+            f"Length type must be a TypeNode[int] or an instance of it, got {args[1]} instead."
         )
 
 
-def parse_annotation(annotation: type, options: BinarySerializableOptions) -> TypeNode:
-    if isinstance(annotation, str):
-        raise ValueError(
-            f"Annotation is a string: {annotation}. Use resolve_annotation_str to resolve it."
-        )
-
+def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> TypeNode:
     if annotation in PRIMITIVES:
         args = get_args(annotation)
         assert len(args) >= 2 and issubclass(args[1], TypeNode), (
@@ -133,7 +116,7 @@ def parse_annotation(annotation: type, options: BinarySerializableOptions) -> Ty
         )
         return args[1]()
 
-    origin = get_origin(annotation) or annotation
+    origin = get_origin_type(annotation)
     args = get_args(annotation)
 
     if annotation is cstr:
@@ -150,25 +133,19 @@ def parse_annotation(annotation: type, options: BinarySerializableOptions) -> Ty
         )
         return ListNode(elem_node, options.default_length_encoding)
 
-    if origin is list_d:
-        assert len(args) == 2, "list_d must have two arguments"
-        raw_elem, raw_size = args
-        elem_node = parse_annotation(
-            annotation=raw_elem,
-            options=options,
-        )
-        size_node = parse_annotated_length(annotation=raw_size)
-        return ListNode(elem_node, size_node)
-
     if origin is tuple:
         return TupleNode(
             tuple(parse_annotation(annotation=arg, options=options) for arg in args)
         )
 
-    if origin is str_d:
-        assert len(args) == 1, "str_d must have one argument"
-        size_node = parse_annotated_length(annotation=args[0])
-        return StringNode(size_node)
+    if origin is member:
+        assert len(args) >= 1, "member must have at least one argument"
+        member_type = args[0]
+        member_options = replace(options)
+        for option in args[1:]:
+            member_options = parse_option(option, member_options)
+
+        return parse_annotation(member_type, member_options)
 
     if origin is Annotated:
         for arg in args:
@@ -188,4 +165,57 @@ def parse_annotation(annotation: type, options: BinarySerializableOptions) -> Ty
     )
 
 
-__all__ = ("BinarySerializable",)
+def parse_option(
+    option_type: Any, options: BinarySerializableOptions
+) -> BinarySerializableOptions:
+    arguments = get_args(option_type)
+    origin = get_origin_type(option_type)
+
+    if origin is default_length_encoding:
+        new_encoding = parse_length_type(arguments[0])
+        return replace(options, default_length_encoding=new_encoding)
+
+    return options
+
+
+def get_serialization_options(
+    arguments: tuple[Any, ...], current_options: BinarySerializableOptions
+) -> BinarySerializableOptions:
+    if len(arguments) == 0:
+        return current_options
+
+    options = current_options
+    for argument in arguments:
+        options = parse_option(argument, options)
+
+    return options
+
+
+def get_type_serialization_options(cls: type[BinarySerializable]):
+    spec = get_binary_serializable_spec(cls)
+    arguments = get_args(spec)
+    return get_serialization_options(arguments, BinarySerializableOptions())
+
+
+@cache
+def build_type_node[T: BinarySerializable](cls: type[T]) -> ClassNode[T]:
+    # get default options from the class
+    serialization_options = get_type_serialization_options(cls)
+
+    # get all member type hintss
+    type_hints = get_type_hints(cls, include_extras=True)
+
+    names = tuple(type_hints.keys())
+    nodes = tuple(
+        parse_annotation(annotation, serialization_options)
+        for annotation in type_hints.values()
+    )
+
+    return ClassNode(
+        names=names,
+        nodes=nodes,
+        call=cls.from_parsed_dict,
+    )
+
+
+__all__ = ("BinarySerializable", "default_length_encoding", "member")
