@@ -71,14 +71,14 @@ class BinarySerializable[*TOptions](Serializable):
 
 @dataclass(frozen=True)
 class BinarySerializableOptions:
-    default_length_encoding: TypeNode[int] = U32Node()
+    length_type: TypeNode[int] = U32Node()
 
 
 class BinarySerializableOption(metaclass=ABCMeta): ...
 
 
 type AllowedLengthTypes = i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64
-type default_length_encoding[T: AllowedLengthTypes] = BinarySerializableOption
+type length_type[T: AllowedLengthTypes] = BinarySerializableOption
 type member[TType, *TOptions] = Annotated[TType, *TOptions]
 
 
@@ -123,7 +123,7 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
         return StringNode()
 
     if annotation is str:
-        return StringNode(options.default_length_encoding)
+        return StringNode(options.length_type)
 
     if origin is list:
         assert len(args) == 1, "list must have one argument"
@@ -131,7 +131,7 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
             annotation=args[0],
             options=options,
         )
-        return ListNode(elem_node, options.default_length_encoding)
+        return ListNode(elem_node, options.length_type)
 
     if origin is tuple:
         return TupleNode(
@@ -171,9 +171,9 @@ def parse_option(
     arguments = get_args(option_type)
     origin = get_origin_type(option_type)
 
-    if origin is default_length_encoding:
+    if origin is length_type:
         new_encoding = parse_length_type(arguments[0])
-        return replace(options, default_length_encoding=new_encoding)
+        return replace(options, length_type=new_encoding)
 
     return options
 
@@ -218,4 +218,4 @@ def build_type_node[T: BinarySerializable](cls: type[T]) -> ClassNode[T]:
     )
 
 
-__all__ = ("BinarySerializable", "default_length_encoding", "member")
+__all__ = ("BinarySerializable", "length_type", "member")
