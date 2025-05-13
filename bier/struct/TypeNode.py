@@ -1,83 +1,16 @@
-from __future__ import annotations
-
+from abc import ABCMeta
 from dataclasses import dataclass
-from enum import IntEnum, auto
-from typing import (
-    Callable,
-    Generic,
-    Sequence,
-    TypeVar,
-)
+from typing import Any, Callable, ClassVar, Self, Sequence, TypeVar
 
-from ..EndianedBinaryIO import EndianedReaderIOBase, EndianedWriterIOBase
+from .Serializable import Serializable, Serializer
 
 T = TypeVar("T")
 
 
-class TypeNodeType(IntEnum):
-    NONE = 0
-
-    PRIMITIVE_START = auto()
-    U8 = auto()
-    U16 = auto()
-    U32 = auto()
-    U64 = auto()
-    I8 = auto()
-    I16 = auto()
-    I32 = auto()
-    I64 = auto()
-    F16 = auto()
-    F32 = auto()
-    F64 = auto()
-    VARINT = auto()
-    VARUINT = auto()
-    PRIMITIVE_END = auto()
-
-    STRING_START = auto()
-    STRING = auto()  # length prefixed
-    CSTRING = auto()  # null terminated
-    STRING_END = auto()
-
-    LIST = auto()
-    TUPLE = auto()
-    CLASS = auto()
+class TypeNode(Serializer[T], metaclass=ABCMeta): ...
 
 
-class TypeNode(Generic[T]):
-    def parse(self, reader: EndianedReaderIOBase) -> T:
-        """Parse the data into the appropriate type."""
-        raise NotImplementedError("Subclasses must implement parse method.")
-
-    def write(self, writer: EndianedWriterIOBase, value: T) -> int:
-        """Write the data to the appropriate type."""
-        raise NotImplementedError("Subclasses must implement write method.")
-
-
-LAMBDA_PARSE = "lambda reader: reader.read_{}()"
-LAMBDA_WRITE = "lambda writer, value: writer.write_{}(value)"
-
-PRIMITIVE_NODE_MAP = {
-    primitive: (
-        eval(LAMBDA_PARSE.format(primitive.name.lower())),
-        eval(LAMBDA_WRITE.format(primitive.name.lower())),
-    )
-    for primitive in [
-        TypeNodeType.U8,
-        TypeNodeType.U16,
-        TypeNodeType.U32,
-        TypeNodeType.U64,
-        TypeNodeType.I8,
-        TypeNodeType.I16,
-        TypeNodeType.I32,
-        TypeNodeType.I64,
-        TypeNodeType.F16,
-        TypeNodeType.F32,
-        TypeNodeType.F64,
-    ]
-}
-
-
-@dataclass()
+@dataclass(init=False, frozen=True)
 class PrimitiveNode(TypeNode[T]):
     """Primitive types are directly parsable and mapped to C types.
 
@@ -86,15 +19,132 @@ class PrimitiveNode(TypeNode[T]):
     F16, F32, F64
     """
 
-    primitive: TypeNodeType
+    size: ClassVar[int]
 
-    def __post_init__(self):
-        if (
-            self.primitive < TypeNodeType.PRIMITIVE_START
-            or self.primitive > TypeNodeType.PRIMITIVE_END
-        ):
-            raise ValueError("Invalid primitive type")
-        self.parse, self.write = PRIMITIVE_NODE_MAP[self.primitive]
+    def __new__(cls, *args, **kwargs) -> Self:
+        if cls in PRIMITIVE_INSTANCE_MAP:
+            return PRIMITIVE_INSTANCE_MAP[cls]
+
+        instance = super(PrimitiveNode, cls).__new__(cls, *args, **kwargs)
+        PRIMITIVE_INSTANCE_MAP[cls] = instance
+        return instance
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}"
+
+
+type PrimitiveInstanceMapType[T] = dict[type[PrimitiveNode[T]], PrimitiveNode[T]]
+PRIMITIVE_INSTANCE_MAP: PrimitiveInstanceMapType = {}
+
+
+class U8Node(PrimitiveNode[int]):
+    size = 1
+
+    def read_from(self, reader):
+        return reader.read_u8()
+
+    def write_to(self, value, writer):
+        return writer.write_u8(value)
+
+
+class U16Node(PrimitiveNode[int]):
+    size = 2
+
+    def read_from(self, reader):
+        return reader.read_u16()
+
+    def write_to(self, value, writer):
+        return writer.write_u16(value)
+
+
+class U32Node(PrimitiveNode[int]):
+    size = 4
+
+    def read_from(self, reader):
+        return reader.read_u32()
+
+    def write_to(self, value, writer):
+        return writer.write_u32(value)
+
+
+class U64Node(PrimitiveNode[int]):
+    size = 8
+
+    def read_from(self, reader):
+        return reader.read_u64()
+
+    def write_to(self, value, writer):
+        return writer.write_u64(value)
+
+
+class I8Node(PrimitiveNode[int]):
+    size = 1
+
+    def read_from(self, reader):
+        return reader.read_i8()
+
+    def write_to(self, value, writer):
+        return writer.write_i8(value)
+
+
+class I16Node(PrimitiveNode[int]):
+    size = 2
+
+    def read_from(self, reader):
+        return reader.read_i16()
+
+    def write_to(self, value, writer):
+        return writer.write_i16(value)
+
+
+class I32Node(PrimitiveNode[int]):
+    size = 4
+
+    def read_from(self, reader):
+        return reader.read_i32()
+
+    def write_to(self, value, writer):
+        return writer.write_i32(value)
+
+
+class I64Node(PrimitiveNode[int]):
+    size = 8
+
+    def read_from(self, reader):
+        return reader.read_i64()
+
+    def write_to(self, value, writer):
+        return writer.write_i64(value)
+
+
+class F16Node(PrimitiveNode[float]):
+    size = 2
+
+    def read_from(self, reader):
+        return reader.read_f16()
+
+    def write_to(self, value, writer):
+        return writer.write_f16(value)
+
+
+class F32Node(PrimitiveNode[float]):
+    size = 4
+
+    def read_from(self, reader):
+        return reader.read_f32()
+
+    def write_to(self, value, writer):
+        return writer.write_f32(value)
+
+
+class F64Node(PrimitiveNode[float]):
+    size = 8
+
+    def read_from(self, reader):
+        return reader.read_f64()
+
+    def write_to(self, value, writer):
+        return writer.write_f64(value)
 
 
 @dataclass(frozen=True)
@@ -105,25 +155,27 @@ class StringNode(TypeNode[str]):
     If type_info is a TypeNode, it is a length-prefixed string with the given type as the length encoding.
     """
 
-    size_node: PrimitiveNode | None = None
+    size_node: TypeNode[int] | None = None
+    encoding: str = "utf-8"
+    errors: str = "surrogateescape"
 
-    def parse(self, reader: EndianedReaderIOBase) -> str:
+    def read_from(self, reader):
         if self.size_node is None:
             # C-style string
             return reader.read_string_c()
         else:
             # Length-prefixed string
-            length = self.size_node.parse(reader)
-            return reader.read(length).decode("utf-8")
+            length = self.size_node.read_from(reader)
+            return reader.read(length).decode(self.encoding, self.errors)
 
-    def write(self, writer: EndianedWriterIOBase, value: str) -> int:
+    def write_to(self, value, writer):
         if self.size_node is None:
             # C-style string
             return writer.write_string_c(value)
         else:
             # Length-prefixed string
-            encoded_value = value.encode("utf-8")
-            total_size = self.size_node.write(writer, len(encoded_value))
+            encoded_value = value.encode(self.encoding, self.errors)
+            total_size = self.size_node.write_to(len(encoded_value), writer)
             total_size += writer.write(encoded_value)
             return total_size
 
@@ -137,16 +189,15 @@ class ListNode(TypeNode[list[T]]):
     """
 
     elem_node: TypeNode[T]
-    size_node: PrimitiveNode
+    size_node: TypeNode[int]
 
-    def parse(self, reader: EndianedReaderIOBase):
-        length = self.size_node.parse(reader)
-        return [self.elem_node.parse(reader) for _ in range(length)]
+    def read_from(self, reader):
+        length = self.size_node.read_from(reader)
+        return [self.elem_node.read_from(reader) for _ in range(length)]
 
-    def write(self, writer: EndianedWriterIOBase, value: Sequence[T]) -> int:
-        total_size = self.size_node.write(writer, len(value))
-        for element in value:
-            total_size += self.elem_node.write(writer, element)
+    def write_to(self, value: Sequence[T], writer) -> int:
+        total_size = self.size_node.write_to(len(value), writer)
+        total_size += sum(self.elem_node.write_to(element, writer) for element in value)
         return total_size
 
 
@@ -156,35 +207,45 @@ class TupleNode(TypeNode[tuple[T, ...]]):
 
     nodes: tuple[TypeNode[T], ...]
 
-    def parse(self, reader: EndianedReaderIOBase):
-        return tuple(node.parse(reader) for node in self.nodes)
+    def read_from(self, reader):
+        return tuple(node.read_from(reader) for node in self.nodes)
 
-    def write(self, writer: EndianedWriterIOBase, value: tuple[T, ...]) -> int:
-        total_size = 0
-        for field, val in zip(self.nodes, value):
-            total_size += field.write(writer, val)
-        return total_size
+    def write_to(self, value: tuple[T, ...], writer) -> int:
+        return sum(node.write_to(val, writer) for node, val in zip(self.nodes, value))
 
 
-@dataclass
+@dataclass(frozen=True)
 class ClassNode(TypeNode[T]):
     """ClassNode relates to a class of parsable nodes of different types."""
 
-    nodes: tuple[TypeNode]
-    names: tuple[str]
-    call: Callable
+    nodes: tuple[TypeNode, ...]
+    names: tuple[str, ...]
+    call: Callable[[dict[str, Any]], T]
 
-    def parse(self, reader: EndianedReaderIOBase):
+    def read_from(self, reader):
         raw_data = {
-            name: node.parse(reader) for name, node in zip(self.names, self.nodes)
+            name: node.read_from(reader) for name, node in zip(self.names, self.nodes)
         }
         return self.call(raw_data)
 
-    def write(self, writer: EndianedWriterIOBase, value: T) -> int:
+    def write_to(self, value: T, writer):
         return sum(
-            node.write(writer, getattr(value, name))
+            node.write_to(getattr(value, name), writer)
             for name, node in zip(self.names, self.nodes)
         )
+
+
+@dataclass(frozen=True)
+class StructNode[T: Serializable](TypeNode[T]):
+    """StructNode relates to a struct of parsable nodes of different types."""
+
+    clz: type[T]
+
+    def read_from(self, reader):
+        return self.clz.read_from(reader)
+
+    def write_to(self, value: T, writer):
+        return value.write_to(writer)
 
 
 __all__ = (
@@ -194,5 +255,16 @@ __all__ = (
     "ListNode",
     "TupleNode",
     "ClassNode",
-    "TypeNodeType",
+    "StructNode",
+    "U8Node",
+    "U16Node",
+    "U32Node",
+    "U64Node",
+    "I8Node",
+    "I16Node",
+    "I32Node",
+    "I64Node",
+    "F16Node",
+    "F32Node",
+    "F64Node",
 )

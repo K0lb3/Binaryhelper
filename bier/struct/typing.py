@@ -1,27 +1,41 @@
 from typing import Annotated, TypeVar
 
-from .TypeNode import TypeNodeType
+from .TypeNode import (
+    F16Node,
+    F32Node,
+    F64Node,
+    I8Node,
+    I16Node,
+    I32Node,
+    I64Node,
+    ListNode,
+    StringNode,
+    U8Node,
+    U16Node,
+    U32Node,
+    U64Node,
+)
 
 T = TypeVar("T")
 S = TypeVar("S")
 
-u8 = Annotated[int, TypeNodeType.U8]
-u16 = Annotated[int, TypeNodeType.U16]
-u32 = Annotated[int, TypeNodeType.U32]
-u64 = Annotated[int, TypeNodeType.U64]
+u8 = Annotated[int, U8Node]
+u16 = Annotated[int, U16Node]
+u32 = Annotated[int, U32Node]
+u64 = Annotated[int, U64Node]
 
-i8 = Annotated[int, TypeNodeType.I8]
-i16 = Annotated[int, TypeNodeType.I16]
-i32 = Annotated[int, TypeNodeType.I32]
-i64 = Annotated[int, TypeNodeType.I64]
+i8 = Annotated[int, I8Node]
+i16 = Annotated[int, I16Node]
+i32 = Annotated[int, I32Node]
+i64 = Annotated[int, I64Node]
 
-f16 = Annotated[float, TypeNodeType.F16]
-f32 = Annotated[float, TypeNodeType.F32]
-f64 = Annotated[float, TypeNodeType.F64]
+f16 = Annotated[float, F16Node]
+f32 = Annotated[float, F32Node]
+f64 = Annotated[float, F64Node]
 
-type cstr = Annotated[str, TypeNodeType.CSTRING]
-type str_d[T] = Annotated[str, T]
-type list_d[S, T] = Annotated[list[S], T]
+cstr = Annotated[str, StringNode, None]
+type str_d[T: int] = Annotated[str, StringNode, T]
+type list_d[S, T: int] = Annotated[list[S], ListNode, T]
 
 __all__ = (
     "u8",

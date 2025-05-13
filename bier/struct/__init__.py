@@ -6,6 +6,7 @@ from .TypeNode import (
     StringNode,
     TupleNode,
     TypeNode,
+    U8Node,
 )
 from .typing import (
     cstr,
