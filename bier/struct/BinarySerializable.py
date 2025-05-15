@@ -1,5 +1,6 @@
 from abc import ABCMeta
 from dataclasses import dataclass, replace
+from enum import Enum, IntEnum, StrEnum, IntFlag
 from functools import cache
 from inspect import isclass
 from types import get_original_bases
@@ -25,6 +26,7 @@ from .TypeNode import (
     TupleNode,
     TypeNode,
     U32Node,
+    EnumNode,
 )
 from .typing import (
     cstr,
@@ -191,6 +193,17 @@ def parse_length_type(annotation: Annotated[Any, ...]) -> TypeNode[int]:
     )
 
 
+def parse_enum_base_type(clz: type[Enum]) -> type:
+    for enum_spec, value_type in [(StrEnum, str), (IntEnum, int), (IntFlag, int)]:
+        if issubclass(clz, enum_spec):
+            return value_type
+
+    bases = get_original_bases(clz)
+    assert len(bases) == 2, "enum member must have two arguments"
+    assert bases[1] is Enum, "enum second base type must be Enum"
+    return bases[0]
+
+
 def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> TypeNode:
     if annotation in PRIMITIVES:
         args = get_args(annotation)
@@ -246,8 +259,13 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
             elif issubclass(arg, BinarySerializable):
                 return StructNode(clz=arg)
 
-    if isclass(annotation) and issubclass(annotation, Serializable):
-        return StructNode(clz=annotation)
+    if isclass(annotation):
+        if issubclass(annotation, Serializable):
+            return StructNode(clz=annotation)
+
+        if issubclass(annotation, Enum):
+            value_type = parse_enum_base_type(annotation)
+            return EnumNode(annotation, parse_annotation(value_type, options))
 
     if get_origin(annotation.__value__) is custom:
         return parse_annotation(
