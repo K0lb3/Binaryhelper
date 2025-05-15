@@ -13,9 +13,9 @@ modules:
   - v - varint
   - () - tuples (groups)
   - x\*y - read an x, then read x times y (e.g. i*s for strings with their lengths described with a prior int)
-- Serialization (TODO) - annotation based class serialization  
+- serialization - annotation based class serialization
 
-## struct
+## Serialization
 
 ### BinarySerializable
 
@@ -44,6 +44,9 @@ __Annotation Types__
   - tuple[T1, T2, ...]
 - objects
   - class (has to inherit from BinarySerializible as well)
+- bytes:
+  - bytes (default delimited length)
+  - bytes_d[T] (delimited length of type T)
 
 __Example__
 ```py
