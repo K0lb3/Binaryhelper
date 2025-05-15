@@ -1,4 +1,4 @@
-from typing import Annotated, TypeVar
+from typing import Annotated
 
 from .TypeNode import (
     F16Node,
@@ -15,8 +15,7 @@ from .TypeNode import (
     U64Node,
 )
 
-T = TypeVar("T")
-S = TypeVar("S")
+# primitive types
 
 u8 = Annotated[int, U8Node]
 u16 = Annotated[int, U16Node]
@@ -35,6 +34,7 @@ f64 = Annotated[float, F64Node]
 cstr = Annotated[str, StringNode, None]
 
 __all__ = (
+    # primitives
     "u8",
     "u16",
     "u32",

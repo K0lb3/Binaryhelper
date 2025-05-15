@@ -1,14 +1,12 @@
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Self, Sequence, TypeVar
+from typing import Any, Callable, ClassVar, Self, Sequence
 from enum import Enum
 
 from .Serializable import Serializable, Serializer
 
-T = TypeVar("T")
 
-
-class TypeNode(Serializer[T], metaclass=ABCMeta): ...
+class TypeNode[T](Serializer[T], metaclass=ABCMeta): ...
 
 
 @dataclass(frozen=True)
@@ -29,7 +27,7 @@ class StaticLengthNode(TypeNode[int]):
 
 
 @dataclass(init=False, frozen=True)
-class PrimitiveNode(TypeNode[T]):
+class PrimitiveNode[T](TypeNode[T]):
     """Primitive types are directly parsable and mapped to C types.
 
     U8, U16, U32, U64
@@ -218,7 +216,7 @@ class BytesNode(TypeNode[bytes]):
 
 
 @dataclass(frozen=True)
-class ListNode(TypeNode[list[T]]):
+class ListNode[T](TypeNode[list[T]]):
     """ListNode relates to a list of parsable nodes of the same type as type_info encoded with a variable length encoding.
 
     The first element of type_info is the length encoding type.
@@ -239,7 +237,7 @@ class ListNode(TypeNode[list[T]]):
 
 
 @dataclass(frozen=True)
-class TupleNode(TypeNode[tuple[T, ...]]):
+class TupleNode[T](TypeNode[tuple[T, ...]]):
     """TupleNode relates to a tuple of parsable nodes of different types."""
 
     nodes: tuple[TypeNode[T], ...]
@@ -252,7 +250,7 @@ class TupleNode(TypeNode[tuple[T, ...]]):
 
 
 @dataclass(frozen=True)
-class ClassNode(TypeNode[T]):
+class ClassNode[T](TypeNode[T]):
     """ClassNode relates to a class of parsable nodes of different types."""
 
     nodes: tuple[TypeNode, ...]
