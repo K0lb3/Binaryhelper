@@ -14,7 +14,7 @@ dynamic = ["version"]
 [project.optional-dependencies]
 # optional dependencies must be lowercase/normalized
 tests = ["pytest"]
-dev = ["ruff", "bier[tests]"]
+dev = ["ruff", "pre-commit", "bier[tests]"]
 
 [project.urls]
 "Homepage" = "https://github.com/K0lb3/bier"
