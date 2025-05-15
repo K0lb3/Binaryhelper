@@ -116,6 +116,42 @@ str_d = custom[str, T]
 bytes_d = custom[bytes, T]
 
 
+def resolve_genericalias(origin: type, args: tuple[Any, ...]):
+    """
+    Remap a GenericAlias instance to its underlying __value__ GenericAlias,
+    preserving the correct parameter mapping.
+    """
+    src_parameters = getattr(origin, "__parameters__", ())
+    dst_generic = getattr(origin, "__value__", None)
+    dst_parameters = getattr(dst_generic, "__parameters__", ())
+
+    if not dst_generic:
+        raise TypeError(f"Origin {origin} does not define __value__, cannot resolve.")
+
+    if len(src_parameters) != len(dst_parameters):
+        raise ValueError(
+            f"Generic type {origin} has {len(src_parameters)} parameters, "
+            f"but {len(dst_parameters)} were expected."
+        )
+
+    # Fast path: identical parameter order
+    if src_parameters == dst_parameters:
+        return dst_generic[args]
+
+    # Build mapping: src_param → arg
+    param_to_arg = dict(zip(src_parameters, args))
+
+    # Remap args to dst_parameter order
+    try:
+        reordered_args = tuple(param_to_arg[dst_param] for dst_param in dst_parameters)
+    except KeyError as e:
+        raise ValueError(
+            f"Parameter {e.args[0]} in destination generic is missing in source parameters."
+        ) from None
+
+    return dst_generic[reordered_args]
+
+
 def get_origin_type(cls: type) -> type:
     return get_origin(cls) or cls
 
@@ -188,18 +224,14 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
             tuple(parse_annotation(annotation=arg, options=options) for arg in args)
         )
 
-    if origin in (custom, list_d):
+    if origin is custom:
         assert len(args) >= 1, "member must have at least one argument"
         member_type = args[0]
         member_options = replace(options)
         for option in args[1:]:
             member_options = parse_option(option, member_options)
 
-        ret = parse_annotation(member_type, member_options)
-        if origin is list_d:
-            return ListNode(ret, member_options.length_type)
-        else:
-            return ret
+        return parse_annotation(member_type, member_options)
 
     if origin is member:
         assert len(args) == 1, "member must have one argument"
@@ -216,6 +248,12 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
 
     if isclass(annotation) and issubclass(annotation, Serializable):
         return StructNode(clz=annotation)
+
+    if get_origin(annotation.__value__) is custom:
+        return parse_annotation(
+            resolve_genericalias(origin, args),
+            options=options,
+        )
 
     raise NotImplementedError(
         f"Unsupported annotation: {annotation}. "
