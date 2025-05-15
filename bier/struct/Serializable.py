@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Generic, Self, TypeVar
+from typing import Self
 
 from ..EndianedBinaryIO import (
     EndianedBytesIO,
@@ -7,8 +7,6 @@ from ..EndianedBinaryIO import (
     EndianedWriterIOBase,
     Endianess,
 )
-
-T = TypeVar("T")
 
 
 class Serializable(metaclass=ABCMeta):
@@ -30,7 +28,7 @@ class Serializable(metaclass=ABCMeta):
             return writer.getvalue()
 
 
-class Serializer(Generic[T], metaclass=ABCMeta):
+class Serializer[T](metaclass=ABCMeta):
     @abstractmethod
     def read_from(self, reader: EndianedReaderIOBase) -> T: ...
 

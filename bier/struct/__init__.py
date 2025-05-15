@@ -1,13 +1,5 @@
 from .BinarySerializable import (
     BinarySerializable,
-    bytes_d,
-    custom,
-    default_length_encoding,
-    length_type,
-    list_d,
-    member,
-    static_length,
-    str_d,
 )
 from .TypeNode import (
     ClassNode,
@@ -18,7 +10,13 @@ from .TypeNode import (
     TypeNode,
     U8Node,
 )
-from .typing import (
+from .options import (
+    member,
+    custom,
+    length_type,
+    static_length,
+)
+from .builtins import (
     cstr,
     f16,
     f32,
@@ -31,4 +29,11 @@ from .typing import (
     u16,
     u32,
     u64,
+)
+
+from .builtin_aliases import (
+    list_d,
+    str_d,
+    bytes_d,
+    default_length_encoding,
 )
