@@ -1,6 +1,7 @@
 from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, Self, Sequence, TypeVar
+from enum import Enum
 
 from .Serializable import Serializable, Serializer
 
@@ -284,6 +285,20 @@ class StructNode[T: Serializable](TypeNode[T]):
         return value.write_to(writer)
 
 
+@dataclass(frozen=True)
+class EnumNode[TEnum: Enum, TValue: Serializable](TypeNode[TEnum]):
+    """EnumNode relates to an enum of a serializable type."""
+
+    clz: type[TEnum]
+    value_node: TypeNode[TValue]
+
+    def read_from(self, reader):
+        return self.clz(self.value_node.read_from(reader))
+
+    def write_to(self, value: TEnum, writer):
+        return self.value_node.write_to(value.value, writer)
+
+
 __all__ = (
     "TypeNode",
     "PrimitiveNode",
@@ -305,4 +320,5 @@ __all__ = (
     "F16Node",
     "F32Node",
     "F64Node",
+    "EnumNode",
 )
