@@ -26,9 +26,9 @@ struct half
 };
 
 template <class _Ty>
-    requires 
-        std::is_integral_v<_Ty> || 
-        std::is_floating_point_v<_Ty> || 
+    requires
+        std::is_integral_v<_Ty> ||
+        std::is_floating_point_v<_Ty> ||
         std::is_same_v<_Ty, half> ||
         std::is_trivially_copyable_v<_Ty>
 constexpr _Ty byteswap(const _Ty _Val) noexcept
