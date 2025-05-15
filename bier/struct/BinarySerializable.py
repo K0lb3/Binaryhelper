@@ -1,12 +1,14 @@
-from dataclasses import dataclass, replace
-from inspect import isclass
-from functools import cache
-from types import get_original_bases
 from abc import ABCMeta
+from dataclasses import dataclass, replace
+from functools import cache
+from inspect import isclass
+from types import get_original_bases
 from typing import (
     Annotated,
     Any,
+    Literal,
     Self,
+    TypeVar,
     get_args,
     get_origin,
     get_type_hints,
@@ -14,8 +16,10 @@ from typing import (
 
 from .Serializable import Serializable
 from .TypeNode import (
+    BytesNode,
     ClassNode,
     ListNode,
+    StaticLengthNode,
     StringNode,
     StructNode,
     TupleNode,
@@ -87,8 +91,13 @@ type custom[TType, *TOptions] = Annotated[TType, *TOptions]
 Used for overriding type-level serialization settings for a given member.
 """
 
-type AllowedLengthTypes = i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64
-type length_type[T: int | TypeNode[int]] = BinarySerializableOption
+
+class static_length:
+    def __class_getitem__(cls, item: int):
+        return Annotated[int, Literal[item]]
+
+
+type length_type[T: int | TypeNode[int] | static_length] = BinarySerializableOption
 """
 Used for specifying the type to use when reading a length-providing field.
 Must be serializing an 'int' type.
@@ -99,6 +108,12 @@ default_length_encoding = length_type
 Used for specifying the default type to use when reading a length-providing field.
 Must be serializing an 'int' type.
 """
+
+T = TypeVar("T", bound=length_type)
+
+type list_d[TType, LType: length_type] = custom[list[TType], LType]
+str_d = custom[str, T]
+bytes_d = custom[bytes, T]
 
 
 def get_origin_type(cls: type) -> type:
@@ -113,18 +128,31 @@ def get_binary_serializable_spec(cls: type[BinarySerializable]) -> Any:
     raise ValueError(f"Type {cls} does not inherit from BinarySerializable")
 
 
-def parse_length_type(annotation: Annotated) -> TypeNode[int]:
+def parse_length_type(annotation: Annotated[Any, ...]) -> TypeNode[int]:
     args = get_args(annotation)
     assert len(args) >= 2, "Length type must have two arguments"
-    assert args[0] is int, "Length type must be an int"
-    if issubclass(args[1], TypeNode):
-        return args[1]()
-    elif isinstance(args[1], TypeNode):
+    typ, val = args[0], args[1]
+    assert typ is int, "Length type must be an int"
+    if isclass(val):
+        if issubclass(val, TypeNode):
+            return val()
+        else:
+            raise ValueError(
+                f"Length type must be a TypeNode[int] or an instance of it, got {val} instead."
+            )
+
+    if isinstance(val, TypeNode):
         return args[1]
-    else:
-        raise ValueError(
-            f"Length type must be a TypeNode[int] or an instance of it, got {args[1]} instead."
-        )
+
+    if get_origin(val) is Literal:
+        val_args = get_args(val)
+        assert len(val_args) == 1, "Length type must be a Literal with one argument"
+        assert isinstance(val_args[0], int), "Length type must be an int"
+        return StaticLengthNode(val_args[0])
+
+    raise ValueError(
+        f"Length type must be a TypeNode[int] or an instance of it, got {args[1]} instead."
+    )
 
 
 def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> TypeNode:
@@ -144,6 +172,9 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
     if annotation is str:
         return StringNode(options.length_type)
 
+    if origin is bytes:
+        return BytesNode(options.length_type)
+
     if origin is list:
         assert len(args) == 1, "list must have one argument"
         elem_node = parse_annotation(
@@ -157,14 +188,18 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
             tuple(parse_annotation(annotation=arg, options=options) for arg in args)
         )
 
-    if origin is custom:
+    if origin in (custom, list_d):
         assert len(args) >= 1, "member must have at least one argument"
         member_type = args[0]
         member_options = replace(options)
         for option in args[1:]:
             member_options = parse_option(option, member_options)
 
-        return parse_annotation(member_type, member_options)
+        ret = parse_annotation(member_type, member_options)
+        if origin is list_d:
+            return ListNode(ret, member_options.length_type)
+        else:
+            return ret
 
     if origin is member:
         assert len(args) == 1, "member must have one argument"
@@ -247,4 +282,8 @@ __all__ = (
     "member",
     "default_length_encoding",
     "custom",
+    "static_length",
+    "list_d",
+    "str_d",
+    "bytes_d",
 )
