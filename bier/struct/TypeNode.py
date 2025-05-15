@@ -10,6 +10,22 @@ T = TypeVar("T")
 class TypeNode(Serializer[T], metaclass=ABCMeta): ...
 
 
+@dataclass(frozen=True)
+class StaticLengthNode(TypeNode[int]):
+    """StaticLengthNode is a node with a fixed size.
+
+    The size is defined by the size attribute.
+    """
+
+    size: int
+
+    def read_from(self, reader):
+        return self.size
+
+    def write_to(self, value, writer):
+        return 0
+
+
 @dataclass(init=False, frozen=True)
 class PrimitiveNode(TypeNode[T]):
     """Primitive types are directly parsable and mapped to C types.
@@ -181,6 +197,25 @@ class StringNode(TypeNode[str]):
 
 
 @dataclass(frozen=True)
+class BytesNode(TypeNode[bytes]):
+    """BytesNode is a length-prefixed bytes object.
+
+    The first element of type_info is the length encoding type.
+    """
+
+    size_node: TypeNode[int]
+
+    def read_from(self, reader):
+        length = self.size_node.read_from(reader)
+        return reader.read(length)
+
+    def write_to(self, value: bytes, writer) -> int:
+        total_size = self.size_node.write_to(len(value), writer)
+        total_size += writer.write(value)
+        return total_size
+
+
+@dataclass(frozen=True)
 class ListNode(TypeNode[list[T]]):
     """ListNode relates to a list of parsable nodes of the same type as type_info encoded with a variable length encoding.
 
@@ -256,6 +291,8 @@ __all__ = (
     "TupleNode",
     "ClassNode",
     "StructNode",
+    "BytesNode",
+    "StaticLengthNode",
     "U8Node",
     "U16Node",
     "U32Node",
