@@ -23,6 +23,7 @@ class StaticLengthNode(TypeNode[int]):
         return self.size
 
     def write_to(self, value, writer):
+        assert value == self.size, f"Expected {self.size} values, got {value} values"
         return 0
 
 
