@@ -1,7 +1,7 @@
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Self, Sequence
 from enum import Enum
+from typing import Any, Callable, ClassVar, Self, Sequence
 
 from .Serializable import Serializable, Serializer
 
@@ -297,6 +297,25 @@ class EnumNode[TEnum: Enum, TValue: Serializable](TypeNode[TEnum]):
         return self.value_node.write_to(value.value, writer)
 
 
+@dataclass(frozen=True)
+class ConvertNode[TRaw: Serializable, TValue: Any](TypeNode[TValue]):
+    """ConvertNode parses a value of type TRaw and converts it to TValue using the from_raw function.
+    For writing, it converts the value to TRaw using the to_raw function.
+    """
+
+    raw_node: TypeNode[TRaw]
+    from_raw: Callable[[TRaw], TValue]
+    to_raw: Callable[[TValue], TRaw]
+
+    def read_from(self, reader):
+        raw = self.raw_node.read_from(reader)
+        return self.from_raw(raw)
+
+    def write_to(self, value: TValue, writer):
+        raw = self.to_raw(value)
+        return self.raw_node.write_to(raw, writer)
+
+
 __all__ = (
     "TypeNode",
     "PrimitiveNode",
@@ -319,4 +338,5 @@ __all__ = (
     "F32Node",
     "F64Node",
     "EnumNode",
+    "ConvertNode",
 )

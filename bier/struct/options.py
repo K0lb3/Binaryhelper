@@ -1,9 +1,17 @@
 from abc import ABCMeta
 from dataclasses import dataclass, replace
 from inspect import isclass
-from typing import Annotated, Literal, Any, get_args, Self
-from .TypeNode import TypeNode, U32Node, StaticLengthNode
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    Protocol,
+    Self,
+    get_args,
+)
+
 from ._typing_helpers import get_origin_type
+from .TypeNode import StaticLengthNode, TypeNode, U32Node
 
 
 def parse_length_type(annotation: Annotated[Any, ...]) -> TypeNode[int]:
@@ -73,8 +81,26 @@ Used for specifying the type to use when reading a length-providing field.
 Must be serializing an 'int' type.
 """
 
+
+class Converter[TValue, TRaw](Protocol):
+    @staticmethod
+    def from_raw(raw: TRaw) -> TValue: ...
+
+    @staticmethod
+    def to_raw(value: TValue) -> TRaw: ...
+
+
+type convert[TValue, TRaw, TConverter: Converter] = Annotated[
+    TValue, Converter[TValue, TRaw], TConverter
+]
+"""
+Used for directly converting a value to/from a different type when serializing and deserializing.
+"""
+# pyright complains about Callable | None, but Union seems to be fine????
+
 __all__ = (
     "member",
+    "convert",
     "custom",
     "length_type",
     "static_length",

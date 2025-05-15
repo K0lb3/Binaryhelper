@@ -1,4 +1,4 @@
-from enum import Enum, IntEnum, StrEnum, IntFlag
+from enum import Enum, IntEnum, IntFlag, StrEnum
 from functools import cache
 from inspect import isclass
 from types import get_original_bases
@@ -9,19 +9,8 @@ from typing import (
     get_args,
     get_type_hints,
 )
-from ._typing_helpers import resolve_genericalias, get_origin_type
 
-from .Serializable import Serializable
-from .TypeNode import (
-    BytesNode,
-    ClassNode,
-    ListNode,
-    StringNode,
-    StructNode,
-    TupleNode,
-    TypeNode,
-    EnumNode,
-)
+from ._typing_helpers import get_origin_type, resolve_genericalias
 from .builtins import (
     cstr,
     f16,
@@ -36,7 +25,19 @@ from .builtins import (
     u32,
     u64,
 )
-from .options import member, custom, BinarySerializableOptions
+from .options import BinarySerializableOptions, convert, custom, member
+from .Serializable import Serializable
+from .TypeNode import (
+    BytesNode,
+    ClassNode,
+    ConvertNode,
+    EnumNode,
+    ListNode,
+    StringNode,
+    StructNode,
+    TupleNode,
+    TypeNode,
+)
 
 PRIMITIVES = (
     u8,
@@ -134,6 +135,12 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
     if origin is member:
         assert len(args) == 1, "member must have one argument"
         return parse_annotation(args[0], options)
+
+    if origin is convert:
+        assert len(args) == 3, "convert must have three arguments"
+        value_type, raw_type, converter = args
+        raw_node = parse_annotation(raw_type, options)
+        return ConvertNode(raw_node, converter.from_raw, converter.to_raw)
 
     if origin is Annotated:
         for arg in args:
