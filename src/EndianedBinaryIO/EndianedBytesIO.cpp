@@ -612,7 +612,7 @@ EndianedBytesIO_repr(EndianedBytesIO *self)
     if (self->closed) {
         return PyUnicode_FromString("<EndianedBytesIO [closed]>");
     }
-    
+
     return PyUnicode_FromFormat(
         "<EndianedBytesIO pos=%zd len=%zd endian='%c' closed=%R>",
         self->pos,
