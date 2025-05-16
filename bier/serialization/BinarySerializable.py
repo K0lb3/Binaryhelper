@@ -64,11 +64,11 @@ class BinarySerializable[*TOptions](Serializable):
         return cls(**parsed_dict)
 
     @classmethod
-    def read_from(cls, reader):
-        return cls._get_node().read_from(reader)
+    def read_from(cls, reader, context=None):
+        return cls._get_node().read_from(reader, context)
 
-    def write_to(self, writer):
-        return self._get_node().write_to(self, writer)
+    def write_to(self, writer, context=None):
+        return self._get_node().write_to(self, writer, context)
 
 
 def get_binary_serializable_spec(cls: type[BinarySerializable]) -> Any:
