@@ -26,7 +26,6 @@ class EndianedStreamIO(EndianedIOBase):
         self.write = self.stream.write
         self.writelines = self.stream.writelines
         self.readline = self.stream.readline
-        self.closed = self.stream.closed  # type: ignore
 
         # raw io base methods
         # self.readall = self.stream.readall
@@ -38,12 +37,19 @@ class EndianedStreamIO(EndianedIOBase):
         self.readinto1 = self.stream.readinto1
         self.read1 = self.stream.read1
         # bytesio methods
-        self.name = self.stream.name
         self.getvalue = self.stream.getvalue
         self.getbuffer = self.stream.getbuffer
 
         # IO
         self.truncate = self.stream.truncate
+
+    @property
+    def closed(self) -> bool:
+        return self.stream.closed
+
+    @property
+    def name(self) -> str:
+        return self.stream.name
 
 
 __all__ = ["EndianedStreamIO"]
