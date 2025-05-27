@@ -1,6 +1,5 @@
 # Test & Dev environments
 old/
-test*.py
 
 # Python-generated files
 __pycache__/
