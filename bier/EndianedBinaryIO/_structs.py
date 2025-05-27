@@ -14,17 +14,17 @@ U64_LE = Struct("<Q")
 U64_BE = Struct(">Q")
 
 # signed integers
-I8 = Struct("B")
-I16 = Struct("H")
-I32 = Struct("I")
-I64 = Struct("Q")
+I8 = Struct("b")
+I16 = Struct("h")
+I32 = Struct("i")
+I64 = Struct("q")
 
-I16_LE = Struct("<H")
-I16_BE = Struct(">H")
-I32_LE = Struct("<I")
-I32_BE = Struct(">I")
-I64_LE = Struct("<Q")
-I64_BE = Struct(">Q")
+I16_LE = Struct("<h")
+I16_BE = Struct(">h")
+I32_LE = Struct("<i")
+I32_BE = Struct(">i")
+I64_LE = Struct("<q")
+I64_BE = Struct(">q")
 
 # floats
 F16 = Struct("e")
