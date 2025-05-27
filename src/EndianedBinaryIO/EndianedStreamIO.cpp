@@ -415,7 +415,7 @@ PyType_Spec EndianedStreamIO_Spec = {
 
 static PyModuleDef EndianedStreamIO_module = {
     PyModuleDef_HEAD_INIT,
-    "bier.endianedbinaryio._EndianedStreamIO", // Module name
+    "bier.endianedbinaryio.C.EndianedStreamIO", // Module name
     "",
     -1,   // Optional size of the module state memory
     NULL, // Optional table of module-level functions
@@ -437,7 +437,7 @@ int add_object(PyObject *module, const char *name, PyObject *object)
     return 0;
 }
 
-PyMODINIT_FUNC PyInit__EndianedStreamIO(void)
+PyMODINIT_FUNC PyInit_EndianedStreamIO(void)
 {
     PyObject *m = PyModule_Create(&EndianedStreamIO_module);
     if (m == NULL)

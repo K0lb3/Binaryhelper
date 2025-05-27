@@ -246,7 +246,7 @@ PyType_Spec EndianedIOBase_Spec = {
 
 static PyModuleDef EndianedIOBase_module = {
     PyModuleDef_HEAD_INIT,
-    "bier.endianedbinaryio._EndianedIOBase", // Module name
+    "bier.endianedbinaryio.C.EndianedIOBase", // Module name
     "",
     -1,   // Optional size of the module state memory
     NULL, // Optional table of module-level functions
@@ -268,7 +268,7 @@ int add_object(PyObject *module, const char *name, PyObject *object)
     return 0;
 }
 
-PyMODINIT_FUNC PyInit__EndianedIOBase(void)
+PyMODINIT_FUNC PyInit_EndianedIOBase(void)
 {
     PyObject *m = PyModule_Create(&EndianedIOBase_module);
     if (m == NULL)

@@ -634,7 +634,7 @@ static PyType_Spec EndianedBytesIO_Spec =
 
 static PyModuleDef EndianedBytesIO_module = {
     PyModuleDef_HEAD_INIT,
-    "bier.endianedbinaryio._EndianedBytesIO", // Module name
+    "bier.endianedbinaryio.C.EndianedBytesIO", // Module name
     "",
     -1,   // Optional size of the module state memory
     NULL, // Optional table of module-level functions
@@ -656,7 +656,7 @@ int add_object(PyObject *module, const char *name, PyObject *object)
     return 0;
 }
 
-PyMODINIT_FUNC PyInit__EndianedBytesIO(void)
+PyMODINIT_FUNC PyInit_EndianedBytesIO(void)
 {
     PyObject *m = PyModule_Create(&EndianedBytesIO_module);
     if (m == NULL)

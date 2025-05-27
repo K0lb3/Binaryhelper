@@ -9,7 +9,7 @@ setup(
     packages=find_packages(),
     ext_modules=[
         Extension(
-            "bier.EndianedBinaryIO._EndianedBytesIO",
+            "bier.EndianedBinaryIO.C.EndianedBytesIO",
             ["src/EndianedBinaryIO/EndianedBytesIO.cpp"],
             depends=["src/EndianedBinaryIO/PyConverter.hpp"],
             language="c++",
@@ -17,7 +17,7 @@ setup(
             extra_compile_args=["-std=c++23"],
         ),
         Extension(
-            "bier.EndianedBinaryIO._EndianedStreamIO",
+            "bier.EndianedBinaryIO.C.EndianedStreamIO",
             ["src/EndianedBinaryIO/EndianedStreamIO.cpp"],
             depends=["src/EndianedBinaryIO/PyConverter.hpp"],
             language="c++",
@@ -25,7 +25,7 @@ setup(
             extra_compile_args=["-std=c++23"],
         ),
         Extension(
-            "bier.EndianedBinaryIO._EndianedIOBase",
+            "bier.EndianedBinaryIO.C.EndianedIOBase",
             ["src/EndianedBinaryIO/EndianedIOBase.cpp"],
             depends=["src/PyConverter.hpp"],
             language="c++",
