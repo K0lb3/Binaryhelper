@@ -70,25 +70,34 @@ int EndianedStreamIO_init(EndianedStreamIO *self, PyObject *args, PyObject *kwds
     self->stream = nullptr;
     self->endian = '<'; // default to little-endian
 
+    Py_buffer endian_view{};
+
     static const char *kwlist[] = {
         "stream",
         "endian",
         nullptr};
 
     // Parse arguments
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|c",
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|s*",
                                      const_cast<char **>(kwlist),
                                      &self->stream,
-                                     &self->endian))
+                                     &endian_view))
     {
         return -1;
     }
 
-    // Validate endian
-    if (self->endian != '<' && self->endian != '>')
+    // parse endian argument
+    if (endian_view.buf != nullptr)
     {
-        PyErr_SetString(PyExc_ValueError, "Invalid endian value. Use '<' for little-endian or '>' for big-endian.");
-        return -1;
+        char *buf_ptr = static_cast<char *>(endian_view.buf);
+        // If an endian view is provided, use it
+        if (endian_view.len != 1 || (buf_ptr[0] != '<' && buf_ptr[0] != '>'))
+        {
+            PyErr_SetString(PyExc_ValueError, "Endian must be '<' or '>'.");
+            return -1;
+        }
+        self->endian = buf_ptr[0];
+        PyBuffer_Release(&endian_view);
     }
 
     // get functions from stream
@@ -406,11 +415,11 @@ PyType_Slot EndianedStreamIO_slots[] = {
 };
 
 PyType_Spec EndianedStreamIO_Spec = {
-    "EndianedStreamIO",                       // const char* name;
-    sizeof(EndianedStreamIO),                 // int basicsize;
-    0,                                        // int itemsize;
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, // unsigned int flags;
-    EndianedStreamIO_slots,                   // PyType_Slot *slots;
+    "bier.endianedbinaryio.C.EndianedStreamIO.EndianedStreamIO", // const char* name;
+    sizeof(EndianedStreamIO),                                    // int basicsize;
+    0,                                                           // int itemsize;
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,                    // unsigned int flags;
+    EndianedStreamIO_slots,                                      // PyType_Slot *slots;
 };
 
 static PyModuleDef EndianedStreamIO_module = {

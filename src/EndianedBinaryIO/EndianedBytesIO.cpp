@@ -54,6 +54,8 @@ int EndianedBytesIO_init(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
     self->endian = '<';
     self->closed = false;
 
+    Py_buffer endian_view{};
+
     static const char *kwlist[] = {
         "initial_bytes",
         "endian",
@@ -65,24 +67,32 @@ int EndianedBytesIO_init(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
 
     // Parse arguments
     PyObject *buf{};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|c",
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|s*",
                                      const_cast<char **>(kwlist),
                                      &buf,
-                                     &self->endian))
+                                     &endian_view))
     {
         return -1;
     }
 
+    // parse endian argument
+    if (endian_view.buf != nullptr)
+    {
+        char *buf_ptr = static_cast<char *>(endian_view.buf);
+        // If an endian view is provided, use it
+        if (endian_view.len != 1 || (buf_ptr[0] != '<' && buf_ptr[0] != '>'))
+        {
+            PyErr_SetString(PyExc_ValueError, "Endian must be '<' or '>'.");
+            return -1;
+        }
+        self->endian = buf_ptr[0];
+        PyBuffer_Release(&endian_view);
+    }
+
+    // check if the buffer is contiguous
     if (PyObject_GetBuffer(buf, &self->view, PyBUF_ND))
     {
         PyErr_SetString(PyExc_ValueError, "Incontigous buffer object.");
-        return -1;
-    }
-
-    // Validate endian
-    if (self->endian != '<' && self->endian != '>')
-    {
-        PyErr_SetString(PyExc_ValueError, "Invalid endian value. Use '<' for little-endian or '>' for big-endian.");
         return -1;
     }
 
@@ -609,7 +619,8 @@ PyMethodDef EndianedBytesIO_methods[] = {
 PyObject *
 EndianedBytesIO_repr(EndianedBytesIO *self)
 {
-    if (self->closed) {
+    if (self->closed)
+    {
         return PyUnicode_FromString("<EndianedBytesIO [closed]>");
     }
 
@@ -618,14 +629,13 @@ EndianedBytesIO_repr(EndianedBytesIO *self)
         self->pos,
         self->view.len,
         self->endian,
-        self->closed ? Py_True : Py_False
-    );
+        self->closed ? Py_True : Py_False);
 }
 
 // Usage would be:
 static PyType_Spec EndianedBytesIO_Spec =
     createPyTypeSpec<EndianedBytesIO>(
-        "EndianedBytesIO",
+        "bier.endianedbinaryio.C.EndianedBytesIO.EndianedBytesIO",
         EndianedBytesIO_init,
         EndianedBytesIO_dealloc,
         EndianedBytesIO_members,
