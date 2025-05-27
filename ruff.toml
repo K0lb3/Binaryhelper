@@ -1,5 +1,5 @@
 target-version = "py313"
-include = ["bier", "tests", "setup.py"]
+include = ["bier/*", "tests/*", "setup.py"]
 
 [lint.pydocstyle]
 # Enforce numpy-style docstrings
