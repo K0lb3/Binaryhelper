@@ -60,7 +60,7 @@ class BinarySerializable[*TOptions](Serializable):
         return build_type_node(cls)
 
     @classmethod
-    def from_parsed_dict(cls, parsed_dict: dict[str, Any]) -> Self:
+    def from_dict(cls, parsed_dict: dict[str, Any]) -> Self:
         return cls(**parsed_dict)
 
     @classmethod
@@ -207,7 +207,7 @@ def build_type_node[T: BinarySerializable](cls: type[T]) -> ClassNode[T]:
     return ClassNode(
         names=names,
         nodes=nodes,
-        call=cls.from_parsed_dict,
+        call=cls.from_dict,
     )
 
 
