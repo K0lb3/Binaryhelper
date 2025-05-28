@@ -1,8 +1,14 @@
+from enum import IntEnum, StrEnum
+
 import pytest
 
 from bier.EndianedBinaryIO import EndianedBytesIO
+from bier.serialization import BinarySerializable, cstr, u8
 from bier.serialization.TypeNode import (
     BytesNode,
+    ClassNode,
+    ConvertNode,
+    EnumNode,
     F16Node,
     F32Node,
     F64Node,
@@ -10,9 +16,12 @@ from bier.serialization.TypeNode import (
     I16Node,
     I32Node,
     I64Node,
+    ListNode,
     PrimitiveNode,
     StaticLengthNode,
     StringNode,
+    StructNode,
+    TupleNode,
     TypeNode,
     U8Node,
     U16Node,
@@ -82,38 +91,165 @@ def test_primitive_node_read_write(Node: type[PrimitiveNode], name: str):
     assert writer.tell() == node.size * len(getattr(HELPER, name))
 
 
+class TestIntEnum(IntEnum):
+    X = 1
+    Y = 2
+
+
+class TestStrEnum(StrEnum):
+    X = "x"
+
+
+class TestClass(BinarySerializable):
+    u8v: u8
+    strv: cstr
+
+    def __init__(self, u8v: u8, strv: str):
+        self.u8v = u8v
+        self.strv = strv
+
+    def __eq__(self, other):
+        if not isinstance(other, TestClass):
+            return NotImplemented
+        return self.u8v == other.u8v and self.strv == other.strv
+
+
 @pytest.mark.parametrize(
-    "string, size, error",
+    "node_cls, instance_args, value, expected_raw, error",
     [
-        # string nodes
-        ("Hello, World!", None, None),
-        ("Hello, World!", U8Node(), None),
-        ("Hello, World!", I64Node(), None),
-        ("Hello, World!", StaticLengthNode(13), None),
-        ("Hello, World!", StaticLengthNode(20), AssertionError),
-        # (b"Hello, World!", None, None),
-        (b"Hello, World!", U8Node(), None),
-        (b"Hello, World!", I64Node(), None),
-        (b"Hello, World!", StaticLengthNode(13), None),
-        (b"Hello, World!", StaticLengthNode(20), AssertionError),
+        # StringNode
+        (StringNode, (), "StringNode", b"StringNode\x00", None),
+        (StringNode, (U8Node(),), "StringNode", b"\x0aStringNode", None),
+        (StringNode, (StaticLengthNode(10),), "StringNode", b"StringNode", None),
+        (
+            StringNode,
+            (StaticLengthNode(12),),
+            "StringNode",
+            b"StringNode\x00\x00",
+            AssertionError,
+        ),
+        # BytesNode
+        (BytesNode, (U8Node(),), b"BytesNode", b"\x09BytesNode", None),
+        (BytesNode, (StaticLengthNode(9),), b"BytesNode", b"BytesNode", None),
+        (
+            BytesNode,
+            (StaticLengthNode(11),),
+            b"BytesNode",
+            b"BytesNode\x00\x00",
+            AssertionError,
+        ),
+        # ListNode
+        (
+            ListNode,
+            (U8Node(), StaticLengthNode(HELPER.count)),
+            HELPER.u8,
+            HELPER.raw_u8_le,
+            None,
+        ),
+        (
+            ListNode,
+            (F64Node(), StaticLengthNode(HELPER.count)),
+            HELPER.f64,
+            HELPER.raw_f64_le,
+            None,
+        ),
+        (
+            ListNode,
+            (StringNode(), U8Node()),
+            ["X", "YZ", ""],
+            b"\x03X\00YZ\00\00",
+            None,
+        ),
+        # TupleNode
+        (
+            TupleNode,
+            ((U8Node(), U16Node(), U32Node()),),
+            (1, 2, 3),
+            b"\x01\x02\x00\x03\x00\x00\x00",
+            None,
+        ),
+        (
+            TupleNode,
+            (
+                (
+                    BytesNode(StaticLengthNode(9)),
+                    ListNode(U8Node(), StaticLengthNode(2)),
+                ),
+            ),
+            (b"TupleNode", [1, 2]),
+            b"TupleNode\x01\x02",
+            None,
+        ),
+        # ClassNode
+        (
+            ClassNode,
+            (
+                # nodes
+                (U8Node(), StringNode()),
+                # names
+                ("u8v", "strv"),
+                # call
+                TestClass.from_dict,
+            ),
+            TestClass(u8v=1, strv="test"),
+            b"\x01test\x00",
+            None,
+        ),
+        # StructNode
+        (
+            StructNode,
+            (TestClass,),
+            TestClass(u8v=1, strv="test"),
+            b"\x01test\x00",
+            None,
+        ),
+        # EnumNode
+        (
+            EnumNode,
+            (TestIntEnum, U8Node()),
+            TestIntEnum.X,
+            b"\x01",
+            None,
+        ),
+        (
+            EnumNode,
+            (TestStrEnum, StringNode()),
+            TestStrEnum.X,
+            b"x\x00",
+            None,
+        ),
+        # ConvertNode
+        (
+            ConvertNode,
+            (U16Node(), lambda x: x + 1, lambda x: x - 1),
+            1,
+            b"\x00\x00",
+            None,
+        ),
     ],
 )
-def test_string_bytes_node(
-    string: str | bytes, size: TypeNode[int] | None, error: type | None
+def test_nodetype(
+    node_cls: type[TypeNode],
+    instance_args: tuple,
+    value,
+    expected_raw: bytes,
+    error: type[Exception] | None,
 ):
-    writer = EndianedBytesIO(endian="<")
-    if isinstance(string, str):
-        node = StringNode(size)
-    elif isinstance(string, bytes):
-        assert size is not None, "Size must be provided for bytes nodes"
-        node = BytesNode(size)
+    node = node_cls(*instance_args)
 
-    if error:
-        with pytest.raises(error):
-            node.write_to(string, EndianedBytesIO(endian="<"))  # type: ignore
-    else:
-        writer = EndianedBytesIO(endian="<")
-        node.write_to(string, writer)  # type: ignore
-        writer.seek(0)
-        read_string = node.read_from(writer)
-        assert read_string == string
+    # Test write
+    writer = EndianedBytesIO(endian="<")
+    try:
+        node.write_to(value, writer)
+    except Exception as e:
+        if error and isinstance(e, error):
+            return
+        raise e
+
+    raw = writer.getvalue()
+    assert raw == expected_raw, f"Expected {expected_raw}, got {raw}"
+
+    # Test read
+    writer.seek(0)
+    value_read = node.read_from(writer)
+    assert value_read == value, f"Expected {value}, got {value_read}"
