@@ -287,7 +287,8 @@ class StructNode[T: Serializable](TypeNode[T]):
         return self.clz.read_from(reader, context)
 
     def write_to(self, value: T, writer, context=None):
-        return value.write_to(writer, context)
+        assert isinstance(value, self.clz), f"Expected {self.clz}, got {type(value)}"
+        return self.clz.write_to(value, writer, context)
 
 
 @dataclass(frozen=True)
