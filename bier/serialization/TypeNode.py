@@ -178,7 +178,7 @@ class StringNode(TypeNode[str]):
     def read_from(self, reader, context=None):
         if self.size_node is None:
             # C-style string
-            return reader.read_string_c()
+            return reader.read_cstring()
         else:
             # Length-prefixed string
             length = self.size_node.read_from(reader, context)

@@ -356,7 +356,7 @@ class EndianedReaderIOBase(IOBase, metaclass=abc.ABCMeta):
         return struct.unpack(self.read(struct.size))
 
     # strings
-    def read_string_c(self, encoding: str = "utf-8", errors="surrogateescape") -> str:
+    def read_cstring(self, encoding: str = "utf-8", errors="surrogateescape") -> str:
         """ ""Read a null-terminated string from the stream.
 
         Args:
