@@ -38,7 +38,7 @@ typedef struct
 
 } EndianedBytesIO;
 
-void EndianedBytesIO_dealloc(EndianedBytesIO *self)
+static void EndianedBytesIO_dealloc(EndianedBytesIO *self)
 {
     if (self->view.buf != nullptr)
     {
@@ -47,7 +47,7 @@ void EndianedBytesIO_dealloc(EndianedBytesIO *self)
     PyObject_Del((PyObject *)self);
 }
 
-int EndianedBytesIO_init(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
+static int EndianedBytesIO_init(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
 {
     self->view = {};
     self->pos = 0;
@@ -107,7 +107,7 @@ PyMemberDef EndianedBytesIO_members[] = {
     {NULL} /* Sentinel */
 };
 
-PyObject *EndianedBytesIO_read(EndianedBytesIO *self, PyObject *arg)
+static PyObject *EndianedBytesIO_read(EndianedBytesIO *self, PyObject *arg)
 {
     CHECK_CLOSED
     Py_ssize_t size = 0;
@@ -140,7 +140,7 @@ PyObject *EndianedBytesIO_read(EndianedBytesIO *self, PyObject *arg)
     return PyBytes_FromStringAndSize(buffer, read_size);
 }
 
-PyObject *EndianedBytesIO_readinto(EndianedBytesIO *self, PyObject *arg)
+static PyObject *EndianedBytesIO_readinto(EndianedBytesIO *self, PyObject *arg)
 {
     CHECK_CLOSED
     if (!PyObject_CheckBuffer(arg))
@@ -207,6 +207,49 @@ static PyObject *EndianedBytesIO_read_t(EndianedBytesIO *self, PyObject *unused)
     return PyObject_FromAny(value);
 }
 
+static bool _read_count(EndianedBytesIO *self, PyObject *py_count, Py_ssize_t &count)
+{
+    if ((py_count == nullptr) || (py_count == Py_None))
+    {
+        PyObject *py_count = PyObject_CallMethod(
+            reinterpret_cast<PyObject *>(self),
+            "read_count",
+            "",
+            nullptr);
+        if (py_count == nullptr)
+        {
+            return false;
+        }
+
+        if (!PyLong_Check(py_count))
+        {
+            PyErr_SetString(PyExc_TypeError, "read_count didn't return an integer.");
+            Py_DecRef(py_count);
+            return false;
+        }
+        count = PyLong_AsSsize_t(py_count);
+        Py_DecRef(py_count);
+        return true;
+    }
+    else if (PyLong_Check(py_count))
+    {
+        count = PyLong_AsSsize_t(py_count);
+        if ((count < 0))
+        {
+            PyErr_SetString(PyExc_ValueError, "Invalid size argument.");
+            return false;
+        }
+        else if (PyErr_Occurred())
+        {
+            return false;
+        }
+        return true;
+    }
+
+    PyErr_SetString(PyExc_TypeError, "Argument must be an integer or None.");
+    return false;
+}
+
 template <typename T, char endian>
     requires(
         EndianedReadable<T> &&
@@ -215,38 +258,8 @@ static PyObject *EndianedBytesIO_read_array_t(EndianedBytesIO *self, PyObject *a
 {
     CHECK_CLOSED
     Py_ssize_t size = 0;
-    if (arg == Py_None)
+    if (!_read_count(self, arg, size))
     {
-        PyObject *count_py = PyObject_CallMethod(
-            reinterpret_cast<PyObject *>(self),
-            "read_count",
-            "",
-            nullptr);
-        if (count_py == nullptr)
-        {
-            return nullptr;
-        }
-        if (!PyLong_Check(count_py))
-        {
-            PyErr_SetString(PyExc_TypeError, "read_count didn't return an integer.");
-            Py_DecRef(count_py);
-            return nullptr;
-        }
-        size = PyLong_AsSsize_t(count_py);
-        Py_DecRef(count_py);
-    }
-    else if (PyLong_Check(arg))
-    {
-        size = PyLong_AsSsize_t(arg);
-        if (size < 0)
-        {
-            PyErr_SetString(PyExc_ValueError, "Invalid size argument.");
-            return nullptr;
-        }
-    }
-    else
-    {
-        PyErr_SetString(PyExc_TypeError, "Argument must be an integer or None.");
         return nullptr;
     }
 
@@ -301,7 +314,7 @@ static PyObject *EndianedBytesIO_read_array_t(EndianedBytesIO *self, PyObject *a
     return ret;
 }
 
-PyObject *EndianedBytesIO_seek(EndianedBytesIO *self, PyObject *args)
+static PyObject *EndianedBytesIO_seek(EndianedBytesIO *self, PyObject *args)
 {
     CHECK_CLOSED
     Py_ssize_t offset = 0;
@@ -335,25 +348,25 @@ PyObject *EndianedBytesIO_seek(EndianedBytesIO *self, PyObject *args)
     return PyLong_FromSsize_t(self->pos);
 }
 
-PyObject *EndianedBytesIO_tell(EndianedBytesIO *self, PyObject *args)
+static PyObject *EndianedBytesIO_tell(EndianedBytesIO *self, PyObject *args)
 {
     CHECK_CLOSED
     return PyLong_FromSsize_t(self->pos);
 }
 
-PyObject *EndianedBytesIO_seekable(EndianedBytesIO *self, PyObject *args)
+static PyObject *EndianedBytesIO_seekable(EndianedBytesIO *self, PyObject *args)
 {
     CHECK_CLOSED
     Py_RETURN_TRUE;
 }
 
-PyObject *EndianedBytesIO_readable(EndianedBytesIO *self, PyObject *args)
+static PyObject *EndianedBytesIO_readable(EndianedBytesIO *self, PyObject *args)
 {
     CHECK_CLOSED
     Py_RETURN_TRUE;
 }
 
-PyObject *EndianedBytesIO_writable(EndianedBytesIO *self, PyObject *args)
+static PyObject *EndianedBytesIO_writable(EndianedBytesIO *self, PyObject *args)
 {
     CHECK_CLOSED
     PyObject *ret = self->view.readonly ? Py_False : Py_True;
@@ -361,7 +374,7 @@ PyObject *EndianedBytesIO_writable(EndianedBytesIO *self, PyObject *args)
     return ret;
 }
 
-PyObject *EndianedBytesIO_close(EndianedBytesIO *self, PyObject *args)
+static PyObject *EndianedBytesIO_close(EndianedBytesIO *self, PyObject *args)
 {
     if (self->view.buf != nullptr)
     {
@@ -372,33 +385,33 @@ PyObject *EndianedBytesIO_close(EndianedBytesIO *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
-PyObject *EndianedBytesIO_isattay(EndianedBytesIO *self, PyObject *args)
+static PyObject *EndianedBytesIO_isatty(EndianedBytesIO *self, PyObject *args)
 {
     CHECK_CLOSED
     Py_RETURN_FALSE;
 }
 
-PyObject *EndianedBytesIO_detach(EndianedBytesIO *self, PyObject *no_args)
+static PyObject *EndianedBytesIO_detach(EndianedBytesIO *self, PyObject *no_args)
 {
     CHECK_CLOSED
     PyErr_SetString(PyExc_IOError, "detach() not supported on this type of stream.");
     return nullptr;
 }
 
-PyObject *EndianedBytesIO_fileno(EndianedBytesIO *self, PyObject *no_args)
+static PyObject *EndianedBytesIO_fileno(EndianedBytesIO *self, PyObject *no_args)
 {
     CHECK_CLOSED
     PyErr_SetString(PyExc_OSError, "fileno() not supported on this type of stream.");
     return nullptr;
 }
 
-PyObject *EndianedBytesIO_flush(EndianedBytesIO *self, PyObject *no_args)
+static PyObject *EndianedBytesIO_flush(EndianedBytesIO *self, PyObject *no_args)
 {
     CHECK_CLOSED
     Py_RETURN_NONE;
 }
 
-PyObject *EndianedBytesIO_align(EndianedBytesIO *self, PyObject *arg)
+static PyObject *EndianedBytesIO_align(EndianedBytesIO *self, PyObject *arg)
 {
     CHECK_CLOSED
     Py_ssize_t size;
@@ -422,7 +435,7 @@ PyObject *EndianedBytesIO_align(EndianedBytesIO *self, PyObject *arg)
     return PyLong_FromSsize_t(self->pos);
 }
 
-PyObject *EndianedBytesIO_getValue(EndianedBytesIO *self, void *closure)
+static PyObject *EndianedBytesIO_getValue(EndianedBytesIO *self, void *closure)
 {
     CHECK_CLOSED
     if (PyBytes_CheckExact(self->view.obj))
@@ -433,7 +446,7 @@ PyObject *EndianedBytesIO_getValue(EndianedBytesIO *self, void *closure)
     return PyBytes_FromObject(self->view.obj);
 }
 
-PyObject *EndianedBytesIO_getbuffer(EndianedBytesIO *self, PyObject *args)
+static PyObject *EndianedBytesIO_getbuffer(EndianedBytesIO *self, PyObject *args)
 {
     CHECK_CLOSED
     if (self->view.buf == nullptr)
@@ -461,7 +474,7 @@ static inline PyObject *_EndianedBytesIO_readuntil(EndianedBytesIO *self, char d
     return PyBytes_FromStringAndSize(buffer, read_size);
 }
 
-PyObject *EndianedBytesIO_readline(EndianedBytesIO *self, PyObject *size)
+static PyObject *EndianedBytesIO_readline(EndianedBytesIO *self, PyObject *size)
 {
     CHECK_CLOSED
     Py_ssize_t read_size;
@@ -469,15 +482,98 @@ PyObject *EndianedBytesIO_readline(EndianedBytesIO *self, PyObject *size)
     return _EndianedBytesIO_readuntil(self, '\n', read_size);
 }
 
-PyObject *EndianedBytesIO_cstring(EndianedBytesIO *self, PyObject *size)
+static PyObject *EndianedBytesIO_read_cstring(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
 {
     CHECK_CLOSED
-    Py_ssize_t read_size;
-    CHECK_SIZE_ARG(size, read_size, self->view.len - self->pos);
-    return _EndianedBytesIO_readuntil(self, '\x00', read_size);
+
+    static const char *kwlist[] = {
+        "encoding",
+        "errors",
+        nullptr};
+
+    char *encoding = "utf-8";         // Default encoding
+    char *errors = "surrogateescape"; // Default error handling
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|ss",
+                                     const_cast<char **>(kwlist),
+                                     &encoding,
+                                     &errors))
+    {
+        return nullptr;
+    }
+
+    PyObject *result_bytes = _EndianedBytesIO_readuntil(self, '\x00', self->view.len - self->pos);
+    if (result_bytes == nullptr)
+    {
+        return nullptr;
+    }
+    PyObject *result_str = PyUnicode_FromEncodedObject(result_bytes, encoding, errors);
+    Py_DecRef(result_bytes);
+    return result_str;
 }
 
-PyObject *EndianedBytesIO_readuntil(EndianedBytesIO *self, PyObject *args)
+static PyObject *EndianedBytesIO_read_string(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
+{
+    CHECK_CLOSED
+
+    static const char *kwlist[] = {
+        "length",
+        "encoding",
+        "errors",
+        nullptr};
+
+    PyObject *py_count = nullptr;
+    char *encoding = "utf-8";         // Default encoding
+    char *errors = "surrogateescape"; // Default error handling
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oss",
+                                     const_cast<char **>(kwlist),
+                                     &py_count, &encoding,
+                                     &errors))
+    {
+        return nullptr;
+    }
+
+    Py_ssize_t count = 0;
+    if (!_read_count(self, py_count, count))
+    {
+        return nullptr;
+    }
+    if (count < 0 || count > self->view.len - self->pos)
+    {
+        count = self->view.len - self->pos;
+    }
+    char *buffer = static_cast<char *>(self->view.buf) + self->pos;
+    self->pos += count;
+    return PyUnicode_Decode(buffer, count, encoding, errors);
+}
+
+static PyObject *EndianedBytesIO_read_bytes(EndianedBytesIO *self, PyObject *arg)
+{
+    CHECK_CLOSED
+    Py_ssize_t size = 0;
+    if (!_read_count(self, arg, size))
+    {
+        return nullptr;
+    }
+
+    if (size > self->view.len - self->pos)
+    {
+        PyErr_SetString(PyExc_ValueError, "Read exceeds buffer length.");
+        return nullptr;
+    }
+
+    PyObject *result = PyBytes_FromStringAndSize(
+        static_cast<char *>(self->view.buf) + self->pos, size);
+    if (result == nullptr)
+    {
+        return nullptr;
+    }
+    self->pos += size;
+    return result;
+}
+
+static PyObject *EndianedBytesIO_readuntil(EndianedBytesIO *self, PyObject *args)
 {
     CHECK_CLOSED
     PyObject *delimiter = nullptr;
@@ -516,7 +612,7 @@ PyObject *EndianedBytesIO_readuntil(EndianedBytesIO *self, PyObject *args)
     }
 }
 
-PyObject *EndianedBytesIO_readlines(EndianedBytesIO *self, PyObject *size)
+static PyObject *EndianedBytesIO_readlines(EndianedBytesIO *self, PyObject *size)
 {
     CHECK_CLOSED
     Py_ssize_t read_size;
@@ -550,6 +646,66 @@ PyObject *EndianedBytesIO_readlines(EndianedBytesIO *self, PyObject *size)
         Py_DecRef(line);
     }
     return result;
+}
+
+static PyObject *EndianedBytesIO_read_varint(EndianedBytesIO *self, PyObject *args)
+{
+    CHECK_CLOSED
+    Py_ssize_t value = 0;
+    uint32_t shift = 0;
+
+    while (true)
+    {
+        if (self->pos >= self->view.len)
+        {
+            PyErr_SetString(PyExc_ValueError, "Read exceeds buffer length.");
+            return nullptr;
+        }
+        unsigned char byte = static_cast<unsigned char *>(self->view.buf)[self->pos++];
+        value |= (static_cast<Py_ssize_t>(byte & 0x7F) << shift);
+        if (!(byte & 0x80))
+        {
+            break;
+        }
+        shift += 7;
+        if (shift >= sizeof(Py_ssize_t) * 8)
+        {
+            PyErr_SetString(PyExc_OverflowError, "Varint too large.");
+            return nullptr;
+        }
+    }
+    return PyLong_FromSsize_t(value);
+}
+
+static PyObject *EndianedBytesIO_read_varint_array(EndianedBytesIO *self, PyObject *args)
+{
+    CHECK_CLOSED
+    Py_ssize_t size = 0;
+
+    if (!_read_count(self, args, size))
+    {
+        return nullptr;
+    }
+
+    if (size > self->view.len - self->pos)
+    {
+        PyErr_SetString(PyExc_ValueError, "Read exceeds buffer length.");
+        return nullptr;
+    }
+
+    PyObject *ret = PyTuple_New(size);
+
+    for (Py_ssize_t i = 0; i < size; ++i)
+    {
+        PyObject *item = EndianedBytesIO_read_varint(self, nullptr);
+        if (item == nullptr)
+        {
+            Py_DecRef(ret);
+            return nullptr;
+        }
+        PyTuple_SetItem(ret, i, item); // Steal reference, no need to DECREF
+    }
+    return ret;
 }
 
 // PyObject *EndianedBytesIO_write(EndianedBytesIO *self, PyObject *arg)
@@ -588,35 +744,22 @@ PyObject *EndianedBytesIO_readlines(EndianedBytesIO *self, PyObject *size)
 //     // Py_RETURN_NONE;
 // }
 
-PyMethodDef EndianedBytesIO_methods[] = {
-    {"read", reinterpret_cast<PyCFunction>(EndianedBytesIO_read), METH_O, "Read bytes from the buffer."},
-    {"read1", reinterpret_cast<PyCFunction>(EndianedBytesIO_read), METH_O, "Read bytes from the buffer."}, // basically fullfilling it with normal read
-    {"readinto", reinterpret_cast<PyCFunction>(EndianedBytesIO_readinto), METH_O, "Read bytes into a buffer."},
+static PyMethodDef EndianedBytesIO_methods[] = {
+    GENERATE_ENDIANEDIOBASE_BASE_FUNCTIONS(EndianedBytesIO),
+    {"read1", reinterpret_cast<PyCFunction>(EndianedBytesIO_read), METH_O, "Read bytes from the buffer."},       // basically fullfilling it with normal read
     {"readinto1", reinterpret_cast<PyCFunction>(EndianedBytesIO_readinto), METH_O, "Read bytes into a buffer."}, // basically fullfilling it with normal readinto
     {"readline", reinterpret_cast<PyCFunction>(EndianedBytesIO_readline), METH_O, ""},
     {"readlines", reinterpret_cast<PyCFunction>(EndianedBytesIO_readlines), METH_O, ""},
-    {"seek", reinterpret_cast<PyCFunction>(EndianedBytesIO_seek), METH_VARARGS, "Seek to a position in the buffer."},
-    {"tell", reinterpret_cast<PyCFunction>(EndianedBytesIO_tell), METH_NOARGS, "Get the current position in the buffer."},
-    {"flush", reinterpret_cast<PyCFunction>(EndianedBytesIO_flush), METH_NOARGS, "Flush the buffer."},
     {"detach", reinterpret_cast<PyCFunction>(EndianedBytesIO_detach), METH_NOARGS, "Detach the buffer."},
-    {"fileno", reinterpret_cast<PyCFunction>(EndianedBytesIO_fileno), METH_NOARGS, "Get the file descriptor."},
-    {"isatty", reinterpret_cast<PyCFunction>(EndianedBytesIO_isattay), METH_NOARGS, "Check if the buffer is a TTY."},
-    {"close", reinterpret_cast<PyCFunction>(EndianedBytesIO_close), METH_NOARGS, "Close the buffer."},
-    {"readable", reinterpret_cast<PyCFunction>(EndianedBytesIO_readable), METH_NOARGS, "Check if the buffer is readable."},
-    {"writable", reinterpret_cast<PyCFunction>(EndianedBytesIO_writable), METH_NOARGS, "Check if the buffer is writable."},
-    {"seekable", reinterpret_cast<PyCFunction>(EndianedBytesIO_seekable), METH_NOARGS, "Check if the buffer is seekable."},
     {"getbuffer", reinterpret_cast<PyCFunction>(EndianedBytesIO_getbuffer), METH_NOARGS, "Get the buffer."},
     {"getvalue", reinterpret_cast<PyCFunction>(EndianedBytesIO_getValue), METH_NOARGS, "Get the current value of the buffer."},
     // reader endian based
-    GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS(EndianedBytesIO_read_t),
-    GENERATE_ENDIANEDIOBASE_READ_ARRAY_FUNCTIONS(EndianedBytesIO_read_array_t),
-    {"align", reinterpret_cast<PyCFunction>(EndianedBytesIO_align), METH_O, "Aligns the position of the buffer."},
+    GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS(EndianedBytesIO),
     {"readuntil", reinterpret_cast<PyCFunction>(EndianedBytesIO_readuntil), METH_VARARGS, "Read until a delimiter."},
-    {"read_cstring", reinterpret_cast<PyCFunction>(EndianedBytesIO_cstring), METH_O, "Read until a null terminator."},
     {NULL} /* Sentinel */
 };
 
-PyObject *
+static PyObject *
 EndianedBytesIO_repr(EndianedBytesIO *self)
 {
     if (self->closed)
@@ -654,7 +797,7 @@ static PyModuleDef EndianedBytesIO_module = {
     NULL  // Optional module deallocation function
 };
 
-int add_object(PyObject *module, const char *name, PyObject *object)
+static int add_object(PyObject *module, const char *name, PyObject *object)
 {
     Py_IncRef(object);
     if (PyModule_AddObject(module, name, object) < 0)
