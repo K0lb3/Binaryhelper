@@ -1,23 +1,23 @@
 from random import randint, uniform
 from struct import pack, unpack
-from typing import Callable, Literal
+from typing import Callable, Literal, List
 
 from bier.EndianedBinaryIO import EndianedReaderIOBase, EndianedWriterIOBase, Endianess
 
 
 class EndianedIOTestHelper:
     count: int
-    u8: list[int]
-    u16: list[int]
-    u32: list[int]
-    u64: list[int]
-    i8: list[int]
-    i16: list[int]
-    i32: list[int]
-    i64: list[int]
-    f16: list[float]
-    f32: list[float]
-    f64: list[float]
+    u8: List[int]
+    u16: List[int]
+    u32: List[int]
+    u64: List[int]
+    i8: List[int]
+    i16: List[int]
+    i32: List[int]
+    i64: List[int]
+    f16: List[float]
+    f32: List[float]
+    f64: List[float]
     raw_u8_le: bytes
     raw_u16_le: bytes
     raw_u32_le: bytes
@@ -248,7 +248,7 @@ class EndianedIOTestHelper:
 
     def _generate_random_ints(
         self, min_value: int, max_value: int, count: int
-    ) -> list[int]:
+    ) -> List[int]:
         assert count >= 2, "Count must be at least 2 to include min and max values."
         return [
             min_value,
@@ -262,7 +262,7 @@ class EndianedIOTestHelper:
         max_value: float,
         count: int,
         struct_format: Literal["e", "f", "d"],
-    ) -> list[float]:
+    ) -> List[float]:
         assert count >= 2, "Count must be at least 2 to include min and max values."
         values = [
             min_value,
