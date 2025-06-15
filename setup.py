@@ -24,13 +24,14 @@ setup(
             include_dirs=["src"],
             extra_compile_args=["-std=c++23"],
         ),
-        Extension(
-            "bier.EndianedBinaryIO.C.EndianedIOBase",
-            ["src/EndianedBinaryIO/EndianedIOBase.cpp"],
-            depends=["src/PyConverter.hpp"],
-            language="c++",
-            include_dirs=["src"],
-            extra_compile_args=["-std=c++23"],
-        ),
+        # somehow slower than the pure python version
+        # Extension(
+        #     "bier.EndianedBinaryIO.C.EndianedIOBase",
+        #     ["src/EndianedBinaryIO/EndianedIOBase.cpp"],
+        #     depends=["src/PyConverter.hpp"],
+        #     language="c++",
+        #     include_dirs=["src"],
+        #     extra_compile_args=["-std=c++23"],
+        # ),
     ],
 )
