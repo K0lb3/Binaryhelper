@@ -1,8 +1,12 @@
+import sys
 from setuptools import Extension, find_packages, setup
 from st_zig import enforce_via_build_ext
 
 enforce_via_build_ext()
 
+# only use the limited API if Python 3.11 or newer is used
+# 3.11 added PyBuffer support to the limited API,
+py_limited_api = sys.version_info >= (3, 11)
 
 setup(
     name="bier",
@@ -15,6 +19,7 @@ setup(
             language="c++",
             include_dirs=["src"],
             extra_compile_args=["-std=c++23"],
+            py_limited_api=py_limited_api,
         ),
         Extension(
             "bier.EndianedBinaryIO.C.EndianedStreamIO",
@@ -23,6 +28,7 @@ setup(
             language="c++",
             include_dirs=["src"],
             extra_compile_args=["-std=c++23"],
+            py_limited_api=py_limited_api,
         ),
         # somehow slower than the pure python version
         # Extension(
