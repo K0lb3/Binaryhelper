@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from typing_extensions import Buffer
+from collections.abc import Buffer
 
 from .EndianedIOBase import EndianedIOBase, Endianess
 
