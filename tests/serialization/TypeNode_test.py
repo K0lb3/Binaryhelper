@@ -91,16 +91,16 @@ def test_primitive_node_read_write(Node: type[PrimitiveNode], name: str):
     assert writer.tell() == node.size * len(getattr(HELPER, name))
 
 
-class TestIntEnum(IntEnum):
+class DummyIntEnum(IntEnum):
     X = 1
     Y = 2
 
 
-class TestStrEnum(StrEnum):
+class DummyStrEnum(StrEnum):
     X = "x"
 
 
-class TestClass(BinarySerializable):
+class DummyClass(BinarySerializable):
     u8v: u8
     strv: cstr
 
@@ -109,7 +109,7 @@ class TestClass(BinarySerializable):
         self.strv = strv
 
     def __eq__(self, other):
-        if not isinstance(other, TestClass):
+        if not isinstance(other, DummyClass):
             return NotImplemented
         return self.u8v == other.u8v and self.strv == other.strv
 
@@ -189,32 +189,32 @@ class TestClass(BinarySerializable):
                 # names
                 ("u8v", "strv"),
                 # call
-                TestClass.from_dict,
+                DummyClass.from_dict,
             ),
-            TestClass(u8v=1, strv="test"),
+            DummyClass(u8v=1, strv="test"),
             b"\x01test\x00",
             None,
         ),
         # StructNode
         (
             StructNode,
-            (TestClass,),
-            TestClass(u8v=1, strv="test"),
+            (DummyClass,),
+            DummyClass(u8v=1, strv="test"),
             b"\x01test\x00",
             None,
         ),
         # EnumNode
         (
             EnumNode,
-            (TestIntEnum, U8Node()),
-            TestIntEnum.X,
+            (DummyIntEnum, U8Node()),
+            DummyIntEnum.X,
             b"\x01",
             None,
         ),
         (
             EnumNode,
-            (TestStrEnum, StringNode()),
-            TestStrEnum.X,
+            (DummyStrEnum, StringNode()),
+            DummyStrEnum.X,
             b"x\x00",
             None,
         ),
