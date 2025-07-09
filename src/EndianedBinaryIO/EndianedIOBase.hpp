@@ -1,3 +1,16 @@
+#pragma once
+#define u8 uint8_t
+#define u16 uint16_t
+#define u32 uint32_t
+#define u64 uint64_t
+#define i8 int8_t
+#define i16 int16_t
+#define i32 int32_t
+#define i64 int64_t
+#define f16 half
+#define f32 float
+#define f64 double
+
 #define CHECK_CLOSED                                                        \
     if (self->closed)                                                       \
     {                                                                       \
@@ -29,19 +42,19 @@
         {"read_" #T "_be_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<T, '>'>), METH_O, "Read a " #T " array."}
 
 #define GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS(EndianedIOClass)                                                                                         \
-    {"read_u8", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_t<uint8_t, '|'>), METH_NOARGS, "Read a uint8_t value."},                           \
-        {"read_u8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<uint8_t, '|'>), METH_O, "Read a uint8_t array."},                \
-        {"read_i8", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_t<int8_t, '|'>), METH_NOARGS, "Read an int8_t value."},                        \
-        {"read_i8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<int8_t, '|'>), METH_O, "Read a int8_t array."},                  \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, uint16_t),                                                                        \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, uint32_t),                                                                        \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, uint64_t),                                                                        \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, int16_t),                                                                         \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, int32_t),                                                                         \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, int64_t),                                                                         \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, half),                                                                            \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, float),                                                                           \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, double),                                                                          \
+    {"read_u8", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_t<u8, '|'>), METH_NOARGS, "Read a u8 value."},                                     \
+        {"read_u8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<u8, '|'>), METH_O, "Read a u8 array."},                          \
+        {"read_i8", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_t<i8, '|'>), METH_NOARGS, "Read an i8 value."},                                \
+        {"read_i8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<i8, '|'>), METH_O, "Read a i8 array."},                          \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, u16),                                                                             \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, u32),                                                                             \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, u64),                                                                             \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, i16),                                                                             \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, i32),                                                                             \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, i64),                                                                             \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, f16),                                                                             \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, f32),                                                                             \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, f64),                                                                             \
         {"read_cstring", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_cstring), METH_VARARGS | METH_KEYWORDS, "Read until a null terminator."}, \
         {"read_string", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_string), METH_VARARGS | METH_KEYWORDS, "Read a string."},                  \
         {"read_bytes", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_bytes), METH_O, "Read a byte array."},                                      \
@@ -73,19 +86,19 @@
 //         {"write_" #T "_be_array", reinterpret_cast<PyCFunction>(EndianedBytesIO_write_array_t<T, '>'>), METH_VARARGS, "Write a " #T " array."}
 
 // #define GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS(EndianedIOClass_write_t)                                                                        \
-//     {"write_u8", reinterpret_cast<PyCFunction>(EndianedIOClass_write_t<uint8_t, '|'>), METH_O, "Write a uint8_t value."},                       \
-//         {"write_u8_array", reinterpret_cast<PyCFunction>(EndianedBytesIO_write_array_t<uint8_t, '|'>), METH_VARARGS, "Write a uint8_t array."}, \
-//         {"write_i8", reinterpret_cast<PyCFunction>(EndianedIOClass_write_t<int8_t, '|'>), METH_O, "Write an int8_t value."},                    \
-//         {"write_i8_array", reinterpret_cast<PyCFunction>(EndianedBytesIO_write_array_t<int8_t, '|'>), METH_VARARGS, "Write an int8_t array."},  \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, uint16_t),                                                       \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, uint32_t),                                                       \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, uint64_t),                                                       \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, int16_t),                                                        \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, int32_t),                                                        \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, int64_t),                                                        \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, half),                                                           \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, float),                                                          \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, double)
+//     {"write_u8", reinterpret_cast<PyCFunction>(EndianedIOClass_write_t<u8, '|'>), METH_O, "Write a u8 value."},                       \
+//         {"write_u8_array", reinterpret_cast<PyCFunction>(EndianedBytesIO_write_array_t<u8, '|'>), METH_VARARGS, "Write a u8 array."}, \
+//         {"write_i8", reinterpret_cast<PyCFunction>(EndianedIOClass_write_t<i8, '|'>), METH_O, "Write an i8 value."},                    \
+//         {"write_i8_array", reinterpret_cast<PyCFunction>(EndianedBytesIO_write_array_t<i8, '|'>), METH_VARARGS, "Write an i8 array."},  \
+//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, u16),                                                       \
+//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, u32),                                                       \
+//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, u64),                                                       \
+//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, i16),                                                        \
+//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, i32),                                                        \
+//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, i64),                                                        \
+//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, f16),                                                           \
+//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, f32),                                                          \
+//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, f64)
 
 template <typename T>
 concept EndianedIOConfig = requires {
