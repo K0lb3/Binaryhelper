@@ -49,4 +49,5 @@ jobs:
               run: pip install .[tests]
 
             - name: Run tests
-              run: pytest -vs ./tests
+              run: pytest -vs
+              working-directory: ./tests
