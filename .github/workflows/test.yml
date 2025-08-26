@@ -46,8 +46,7 @@ jobs:
                   python-version: "3.13"
 
             - name: Install
-              run: pip install .[tests]
+              run: pip install -e .[tests]
 
             - name: Run tests
               run: pytest -vs
-              working-directory: ./tests
