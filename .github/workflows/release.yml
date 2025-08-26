@@ -70,6 +70,12 @@ jobs:
         env:
           CIBW_SKIP: "*aarch64 *ppc64le *s390x *armv7l *-musllinux*"
           CIBW_TEST_SKIP: "*"
+          manylinux_x86_64-image: manylinux_2_34
+          manylinux-i686-image: manylinux_2_34
+          manylinux-aarch64-image: manylinux_2_34
+          manylinux-pypy_x86_64-image: manylinux_2_34
+          manylinux-pypy-i686-image: manylinux_2_34
+          manylinux-pypy-aarch64-image: manylinux-aarch64-image
 
       - uses: actions/upload-artifact@v4
         with:
