@@ -160,10 +160,7 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
             value_type = parse_enum_base_type(annotation)
             return EnumNode(annotation, parse_annotation(value_type, options))
 
-    if (
-        hasattr(annotation, "__value__")
-        and get_origin_type(annotation.__value__) is custom
-    ):
+    if hasattr(annotation, "__value__"):
         return parse_annotation(
             resolve_genericalias(origin, args),
             options=options,

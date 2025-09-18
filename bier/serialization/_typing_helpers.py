@@ -19,6 +19,11 @@ def resolve_genericalias(origin: type, args: tuple[Any, ...]):
             f"but {len(dst_parameters)} were expected."
         )
 
+    # if there are no parameters, this is just a normal alias
+    # indexing into dst_generic will throw, we need to return the actual value
+    if len(src_parameters) == 0:
+        return dst_generic
+
     # Fast path: identical parameter order
     if src_parameters == dst_parameters:
         return dst_generic[args]
