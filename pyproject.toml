@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "st_zig"]
+requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,8 +8,8 @@ authors = [{ name = "Rudolf Kolbe", email = "rkolbe96@gmail.com" }]
 description = ""
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.13"
-dynamic = ["version"]
+requires-python = ">=3.8"
+dynamic = ["version", "dependencies"]
 
 [project.optional-dependencies]
 # optional dependencies must be lowercase/normalized
