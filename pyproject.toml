@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=75", "st_zig; platform_system == 'Windows'"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,7 +9,7 @@ description = ""
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 # optional dependencies must be lowercase/normalized
