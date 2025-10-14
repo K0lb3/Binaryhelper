@@ -28,6 +28,9 @@ testpaths = ["tests"]
 
 [tool.cibuildwheel]
 build = "cp313-*"
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-i686-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.linux]
 archs = ["x86_64", "i686", "armv7l", "aarch64"]
@@ -36,7 +39,7 @@ archs = ["x86_64", "i686", "armv7l", "aarch64"]
 archs = ["x86_64", "arm64"]
 
 [tool.cibuildwheel.windows]
-archs = ["AMD64", "x86", "ARM64"]
+archs = ["AMD64"]
 
 [tool.pyright]
 pythonVersion = "3.13"
