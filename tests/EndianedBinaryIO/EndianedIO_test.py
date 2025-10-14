@@ -76,15 +76,14 @@ def test_reader(io_class, stream_factory):
             EndianedFileIO,
             lambda endian: EndianedFileIOTemp.gen_writer(endian),
         ),
-        # not yet implemented
-        # (
-        #     EndianedStreamIOC,
-        #     lambda endian: EndianedStreamIOC(BytesIO(), endian),
-        # ),
-        # (
-        #     EndianedBytesIOC,
-        #     lambda endian: EndianedBytesIOC(bytearray(), endian),
-        # ),
+        (
+            EndianedStreamIOC,
+            lambda endian: EndianedStreamIOC(BytesIO(), endian),
+        ),
+        (
+            EndianedBytesIOC,
+            lambda endian: EndianedBytesIOC(bytearray(1024), endian),
+        ),
     ],
 )
 def test_writer(io_class, stream_factory):
