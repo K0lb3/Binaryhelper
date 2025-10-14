@@ -88,9 +88,9 @@ static int EndianedBytesIO_init(EndianedBytesIO *self, PyObject *args, PyObject 
 
 PyMemberDef EndianedBytesIO_members[] = {
     {"pos", T_PYSSIZET, offsetof(EndianedBytesIO, pos), 0, "pos"},
-    {"length", T_PYSSIZET, offsetof(EndianedBytesIO, view.len), Py_READONLY, "length"},
+    {"length", T_PYSSIZET, offsetof(EndianedBytesIO, view.len), READONLY, "length"},
     {"endian", T_CHAR, offsetof(EndianedBytesIO, endian), 0, "endian"},
-    {"closed", T_BOOL, offsetof(EndianedBytesIO, closed), Py_READONLY, "closed"},
+    {"closed", T_BOOL, offsetof(EndianedBytesIO, closed), READONLY, "closed"},
     {NULL} /* Sentinel */
 };
 
