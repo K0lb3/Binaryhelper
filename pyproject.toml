@@ -27,7 +27,7 @@ version = { attr = "bier.__version__" }
 testpaths = ["tests"]
 
 [tool.cibuildwheel]
-build = "cp313-*"
+build = "cp38-* cp39-* cp310-* cp311-*"
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
 
@@ -41,4 +41,4 @@ archs = ["x86_64", "arm64"]
 archs = ["AMD64", "ARM64"]
 
 [tool.pyright]
-pythonVersion = "3.13"
+pythonVersion = "3.12"
