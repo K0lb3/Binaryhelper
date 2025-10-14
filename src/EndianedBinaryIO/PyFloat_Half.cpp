@@ -54,6 +54,10 @@
 
 static_assert(sizeof(half) == 2, "half must be 2 bytes");
 
+#ifdef Py_LIMITED_API
+static_assert(PY_MINOR_VERSION >= 12, "Python version must be at least 3.12 to use limited API");
+// 3.12 adds Py_INFINITY
+
 double PyFloat_Unpack2(const half &data) noexcept {
   const auto &p = data.bytes[1];
   const bool sign = ((p >> 7) & 1) != 0;
@@ -174,3 +178,18 @@ Overflow:
   PyErr_SetString(PyExc_OverflowError, "float too large to pack with e format");
   return -1;
 }
+#else
+#include "floatobject.h"
+#if PY_MINOR_VERSION < 11
+#define PyFloat_Pack2 _PyFloat_Pack2
+#define PyFloat_Unpack2 _PyFloat_Unpack2
+#endif
+double PyFloat_Unpack2(const half &data) noexcept
+{
+    return PyFloat_Unpack2(reinterpret_cast<const char *>(&data), 1);
+}
+int PyFloat_Pack2(double x, half &data) noexcept
+{
+    return PyFloat_Pack2(x, reinterpret_cast<char *>(&data), 1);
+}
+#endif

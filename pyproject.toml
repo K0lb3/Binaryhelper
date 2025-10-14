@@ -27,7 +27,7 @@ version = { attr = "bier.__version__" }
 testpaths = ["tests"]
 
 [tool.cibuildwheel]
-build = "cp38-* cp39-* cp310-* cp311-*"
+build = "cp38-* cp39-* cp310-* cp311-* cp312-*"
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
 

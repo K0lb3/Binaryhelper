@@ -32,7 +32,7 @@ class bdist_wheel_abi3(bdist_wheel):
 
 # only use the limited API if Python 3.11 or newer is used
 # 3.11 added PyBuffer support to the limited API,
-py_limited_api = sys.version_info >= (3, 11)
+py_limited_api = sys.version_info >= (3, 12)
 cmdclass = {"bdist_wheel": bdist_wheel_abi3} if py_limited_api else {}
 
 setup(
