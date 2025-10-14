@@ -1,3 +1,9 @@
+import sys
+
+if sys.version_info < (3, 12):
+    raise ImportError("bier.serialization requires Python 3.12 or higher")
+del sys
+
 from .BinarySerializable import (
     BinarySerializable,
 )

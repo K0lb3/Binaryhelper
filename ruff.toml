@@ -10,3 +10,5 @@ convention = "numpy"
 "tests/**/*.py" = ["D"]
 # Ignore imported but unused
 "**/__init__.py" = ["F401"]
+
+"bier/serialization/__init__.py" = ["E402"]
