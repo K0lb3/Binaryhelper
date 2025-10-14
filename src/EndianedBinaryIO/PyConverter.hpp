@@ -6,23 +6,14 @@
  * to their Python equivalents using the Python C API. It supports integral types,
  * floating point types, and a custom half-precision float type.
  */
-
+#pragma once
 #include <bit>
 #include <concepts>
 #include <cstdint>
 #include <Python.h>
+#include "./PyFloat_Half.hpp"
 
 constexpr bool IS_BIG_ENDIAN_SYSTEM = (std::endian::native == std::endian::big);
-
-/**
- * @brief Type definition for half-precision (16-bit) floating point values.
- *
- * Defined as 2 bytes for use with PyFloat_Unpack2.
- */
-struct half
-{
-    uint16_t value; // 16-bit representation of the half-precision float
-};
 
 template <class _Ty>
     requires std::is_integral_v<_Ty> ||
@@ -102,12 +93,7 @@ inline PyObject *PyObject_FromAny(T &value)
     }
     else if constexpr (is_same_v<T, half>)
     {
-        double unpacked = PyFloat_Unpack2((const char *)&value, 1);
-        if (unpacked == -1.0 && PyErr_Occurred())
-        {
-            return nullptr; // Return nullptr if unpacking fails
-        }
-        return PyFloat_FromDouble(unpacked);
+        return PyFloat_FromHalf(value);
     }
     else if constexpr (is_same_v<T, float>)
     {
@@ -172,15 +158,9 @@ inline bool PyObject_ToAny(PyObject *obj, T &out)
     }
     else if constexpr (is_same_v<T, half>)
     {
-        double val = PyFloat_AsDouble(obj);
+        out = PyFloat_AsHalf(obj);
         if (PyErr_Occurred())
             return false;
-        // Convert double to IEEE 754 half-precision bits
-        // This is a simple round-trip using float, not precise for all values
-        float fval = static_cast<float>(val);
-        uint16_t bits;
-        memcpy(&bits, &fval, sizeof(uint16_t)); // Not a real half conversion!
-        out.value = bits;
         return true;
     }
     else if constexpr (is_same_v<T, float>)
@@ -200,4 +180,44 @@ inline bool PyObject_ToAny(PyObject *obj, T &out)
         return true;
     }
     return false;
+}
+
+template <typename T>
+concept EndianedIOHandler =
+    requires(T value) {
+        { value.endian } -> std::same_as<char &>;
+    };
+
+template <typename EI, typename T, char endian>
+    requires(
+        EndianedIOHandler<EI> &&
+        EndianedReadable<T> &&
+        (endian == '<' || endian == '>' || endian == '|'))
+static inline void handle_swap(EI *self, T &value)
+{
+    if constexpr ((endian == '<') && IS_BIG_ENDIAN_SYSTEM)
+    {
+        value = byteswap(value);
+    }
+    else if constexpr ((endian == '>') && !IS_BIG_ENDIAN_SYSTEM)
+    {
+        value = byteswap(value);
+    }
+    else if constexpr (sizeof(T) != 1)
+    {
+        if constexpr (IS_BIG_ENDIAN_SYSTEM)
+        {
+            if (self->endian == '<')
+            {
+                value = byteswap(value);
+            }
+        }
+        else
+        {
+            if (self->endian == '>')
+            {
+                value = byteswap(value);
+            }
+        }
+    }
 }
