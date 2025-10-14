@@ -26,6 +26,9 @@ version = { attr = "bier.__version__" }
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.cibuildwheel]
+build = "cp313-*"
+
 [tool.cibuildwheel.linux]
 archs = ["x86_64", "i686", "armv7l", "aarch64"]
 
