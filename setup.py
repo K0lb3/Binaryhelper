@@ -4,11 +4,9 @@ import sys
 from setuptools import Extension, find_packages, setup
 
 if platform.system() == "Windows":
-    # msvc compiler does not support C++23 yet, so have to use zig
-    # currently zig runs into some issues on setuptools on the gh workers
-    from st_zig import enforce_via_build_ext
-
-    enforce_via_build_ext()
+    extra_compile_args = ["/std:c++latest"]
+else:
+    extra_compile_args = ["-std=c++23"]
 
 # only use the limited API if Python 3.11 or newer is used
 # 3.11 added PyBuffer support to the limited API,
@@ -32,7 +30,7 @@ setup(
             depends=default_depends,
             language="c++",
             include_dirs=["src"],
-            extra_compile_args=["-std=c++23"],
+            extra_compile_args=extra_compile_args,
             py_limited_api=py_limited_api,
         ),
         Extension(
@@ -41,7 +39,7 @@ setup(
             depends=default_depends,
             language="c++",
             include_dirs=["src"],
-            extra_compile_args=["-std=c++23"],
+            extra_compile_args=extra_compile_args,
             py_limited_api=py_limited_api,
         ),
         # somehow slower than the pure python version
@@ -54,5 +52,4 @@ setup(
         #     extra_compile_args=["-std=c++23"],
         # ),
     ],
-    install_requires=['st_zig; platform_system=="Windows"'],
 )
