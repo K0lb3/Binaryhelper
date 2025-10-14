@@ -1,4 +1,5 @@
 from enum import IntEnum, StrEnum
+import sys
 
 import pytest
 
@@ -33,6 +34,7 @@ from tests.EndianedBinaryIO.EndianedIOTestHelper import EndianedIOTestHelper
 HELPER = EndianedIOTestHelper()
 
 
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="Requires Python 3.12 or higher")
 def test_primitive_node_singleton():
     class TestPrimitiveNode(PrimitiveNode):
         def read_from(self, reader, context=None):
@@ -46,6 +48,7 @@ def test_primitive_node_singleton():
     assert node1 is node2, "PrimitiveNode should be a singleton"
 
 
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="Requires Python 3.12 or higher")
 @pytest.mark.parametrize(
     "Node, name",
     [
@@ -114,6 +117,7 @@ class DummyClass(BinarySerializable):
         return self.u8v == other.u8v and self.strv == other.strv
 
 
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="Requires Python 3.12 or higher")
 @pytest.mark.parametrize(
     "node_cls, instance_args, value, expected_raw, error",
     [
