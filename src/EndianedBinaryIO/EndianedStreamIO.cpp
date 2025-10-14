@@ -554,6 +554,24 @@ static PyObject *EndianedStreamIO_read_varint_array(EndianedStreamIO *self, PyOb
     return ret;
 }
 
+inline PyObject *_EndianedStreamIO_write_buffer(EndianedStreamIO *self, PyObject *buffer)
+{
+    PyObject *result = PyObject_CallFunctionObjArgs(
+        self->write,
+        buffer,
+        nullptr);
+    return result;
+}
+
+template <typename T>
+inline PyObject *_EndianedStreamIO_write_raw(EndianedStreamIO *self, T *data, const Py_ssize_t size)
+{
+    PyObject *buffer = PyMemoryView_FromMemory(reinterpret_cast<char *>(data), size, PyBUF_READ);
+    PyObject *result = _EndianedStreamIO_write_buffer(self, buffer);
+    Py_DecRef(buffer);
+    return result;
+}
+
 template <typename T, char endian>
     requires(
         EndianedReadable<T> &&
@@ -567,15 +585,7 @@ static PyObject *EndianedStreamIO_write_t(EndianedStreamIO *self, PyObject *arg)
     }
 
     handle_swap<EndianedStreamIO, T, endian>(self, value);
-    PyObject *buffer = PyBytes_FromStringAndSize(reinterpret_cast<const char *>(&value), sizeof(T));
-    if (buffer == nullptr)
-    {
-        return nullptr;
-    }
-
-    PyObject *result = PyObject_CallMethod(self->write, "write", "O", buffer);
-    Py_DecRef(buffer);
-    return result;
+    return _EndianedStreamIO_write_raw(self, &value, sizeof(T));
 }
 
 template <typename T, char endian>
@@ -609,34 +619,23 @@ static PyObject *EndianedStreamIO_write_array_t(EndianedStreamIO *self, PyObject
 
     PyObject *iter = PyObject_GetIter(v);
     PyObject *item = PyIter_Next(iter);
-    T value{};
+    std::vector<T> buffer(count);
     while (item)
     {
+        T value{};
         if (!PyObject_ToAny(item, value))
         {
             Py_DecRef(iter);
             return nullptr; // Conversion failed
         }
-
         handle_swap<EndianedStreamIO, T, endian>(self, value);
-
-        PyObject *buffer = PyBytes_FromStringAndSize(reinterpret_cast<const char *>(&value), sizeof(T));
-        if (buffer == nullptr)
-        {
-            Py_DecRef(item);
-            Py_DecRef(iter);
-            return nullptr;
-        }
-
-        PyObject *result = PyObject_CallMethod(self->write, "write", "O", buffer);
-
-        Py_DecRef(buffer);
+        buffer.push_back(value);
         Py_DecRef(item);
         item = PyIter_Next(iter);
     }
     Py_DecRef(iter);
 
-    return PyLong_FromSsize_t(count * sizeof(T));
+    return _EndianedStreamIO_write_raw(self, buffer.data(), buffer.size() * sizeof(T));
 }
 
 static PyObject *EndianedStreamIO_write_cstring(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
@@ -680,15 +679,16 @@ static PyObject *EndianedStreamIO_write_cstring(EndianedStreamIO *self, PyObject
         Py_DecRef(bytes);
         return nullptr;
     }
+    char *bytes_with_null_data = PyBytes_AsString(bytes_with_null);
 
     // Copy the original bytes and add the null terminator
-    memcpy(PyBytes_AsString(bytes_with_null), PyBytes_AsString(bytes), size);
-    PyBytes_AsString(bytes_with_null)[size] = '\0';
+    memcpy(bytes_with_null_data, PyBytes_AsString(bytes), size);
+    bytes_with_null_data[size] = '\0';
 
     Py_DecRef(bytes);
 
     // Write the bytes with null terminator to the stream
-    PyObject *result = PyObject_CallMethod(self->write, "write", "O", bytes_with_null);
+    PyObject *result = _EndianedStreamIO_write_buffer(self, bytes_with_null);
     Py_DecRef(bytes_with_null);
     return result;
 }
@@ -729,7 +729,7 @@ static PyObject *EndianedStreamIO_write_string(EndianedStreamIO *self, PyObject 
     }
 
     // Write the bytes to the stream
-    PyObject *result = PyObject_CallMethod(self->write, "write", "O", bytes);
+    PyObject *result = _EndianedStreamIO_write_buffer(self, bytes);
     Py_DecRef(bytes);
     return result;
 }
@@ -758,7 +758,7 @@ static PyObject *EndianedStreamIO_write_bytes(EndianedStreamIO *self, PyObject *
         return nullptr; // Resize failed
     }
 
-    return PyObject_CallMethod(self->write, "write", "O", v.obj);
+    return _EndianedStreamIO_write_buffer(self, v.obj);
 }
 
 static PyObject *EndianedStreamIO_write_varint(EndianedStreamIO *self, PyObject *arg)
@@ -790,15 +790,7 @@ static PyObject *EndianedStreamIO_write_varint(EndianedStreamIO *self, PyObject 
         buffer[index++] = static_cast<char>(byte);
     } while (value != 0 && index < sizeof(buffer));
 
-    // Write the varint to the stream
-    PyObject *py_buffer = PyBytes_FromStringAndSize(buffer, index);
-    if (py_buffer == nullptr)
-    {
-        return nullptr;
-    }
-    PyObject *result = PyObject_CallMethod(self->write, "write", "O", py_buffer);
-    Py_DecRef(py_buffer);
-    return result;
+    return _EndianedStreamIO_write_raw(self, buffer, index);
 }
 
 static PyObject *EndianedStreamIO_write_varint_array(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
@@ -865,17 +857,7 @@ static PyObject *EndianedStreamIO_write_varint_array(EndianedStreamIO *self, PyO
     }
     Py_DecRef(iter);
 
-    PyObject *py_buffer = PyBytes_FromStringAndSize(reinterpret_cast<const char *>(buffer.data()), buf_ptr - buffer.data());
-    if (py_buffer == nullptr)
-    {
-        Py_DecRef(item);
-        return nullptr;
-    }
-    PyObject *result = PyObject_CallMethod(self->write, "write", "O", py_buffer);
-    Py_DecRef(py_buffer);
-    Py_DecRef(iter);
-
-    return result;
+    return _EndianedStreamIO_write_raw(self, buffer.data(), buf_ptr - buffer.data());
 }
 
 PyMethodDef EndianedStreamIO_methods[] = {
