@@ -388,6 +388,19 @@ class EndianedReaderIOBase(IOBase, metaclass=abc.ABCMeta):
             length = self.read_count()
         return self.read(length).decode(encoding, errors=errors)
 
+    def read_bytes(
+        self,
+        length: Optional[int] = None,
+    ) -> bytes:
+        """Read a bytes object of a given length from the stream.
+
+        Args:
+            length (int, optional): The length of the bytes to read. If None, use read_count to determine the length.
+        """
+        if length is None:
+            length = self.read_count()
+        return self.read(length)
+
     # custom stuff
     def read_varint(self) -> int:
         """Read a variable-length integer from the stream.
@@ -747,6 +760,17 @@ class EndianedWriterIOBase(IOBase, metaclass=abc.ABCMeta):
         if write_count:
             self.write_count(len(raw_string))
         return self.write(raw_string)
+
+    def write_bytes(self, data: bytes, write_count: bool = True) -> int:
+        """Write a bytes object to the stream.
+
+        Args:
+            data (bytes): The bytes object to write.
+            write_count (bool, optional): Whether to write the length of the bytes first. Defaults to True.
+        """
+        if write_count:
+            self.write_count(len(data))
+        return self.write(data)
 
     # custom stuff
     def write_varint(self, v: int) -> int:
