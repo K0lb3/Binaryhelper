@@ -11,20 +11,7 @@
 #include <algorithm>
 
 // 'truncate'
-
-// 'write'
 // 'writelines'
-// 'write_f16'
-// 'write_f32'
-// 'write_f64'
-// 'write_i16'
-// 'write_i32'
-// 'write_i64'
-// 'write_i8'
-// 'write_u16'
-// 'write_u32'
-// 'write_u64'
-// 'write_u8'
 
 PyObject *EndianedBytesIO_OT = nullptr;
 
@@ -178,36 +165,12 @@ static PyObject *EndianedBytesIO_read_t(EndianedBytesIO *self, PyObject *unused)
     memcpy(&value, static_cast<char *>(self->view.buf) + self->pos, sizeof(T));
     self->pos += sizeof(T);
 
-    if constexpr ((endian == '<') && IS_BIG_ENDIAN_SYSTEM)
-    {
-        value = byteswap(value);
-    }
-    else if constexpr ((endian == '>') && !IS_BIG_ENDIAN_SYSTEM)
-    {
-        value = byteswap(value);
-    }
-    else if constexpr (sizeof(T) != 1)
-    {
-        if constexpr (IS_BIG_ENDIAN_SYSTEM)
-        {
-            if (self->endian == '<')
-            {
-                value = byteswap(value);
-            }
-        }
-        else
-        {
-            if (self->endian == '>')
-            {
-                value = byteswap(value);
-            }
-        }
-    }
+    handle_swap<EndianedBytesIO, T, endian>(self, value);
 
     return PyObject_FromAny(value);
 }
 
-static bool _read_count(EndianedBytesIO *self, PyObject *py_count, Py_ssize_t &count)
+static inline bool _read_count(EndianedBytesIO *self, PyObject *py_count, Py_ssize_t &count)
 {
     if ((py_count == nullptr) || (py_count == Py_None))
     {
@@ -271,37 +234,14 @@ static PyObject *EndianedBytesIO_read_array_t(EndianedBytesIO *self, PyObject *a
 
     PyObject *ret = PyTuple_New(size);
 
+    T value{};
     for (Py_ssize_t i = 0; i < size; ++i)
     {
-        T value{};
+
         memcpy(&value, static_cast<char *>(self->view.buf) + self->pos, sizeof(T));
         self->pos += sizeof(T);
 
-        if constexpr ((endian == '<') && IS_BIG_ENDIAN_SYSTEM)
-        {
-            value = byteswap(value);
-        }
-        else if constexpr ((endian == '>') && !IS_BIG_ENDIAN_SYSTEM)
-        {
-            value = byteswap(value);
-        }
-        else if constexpr (sizeof(T) != 1)
-        {
-            if constexpr (IS_BIG_ENDIAN_SYSTEM)
-            {
-                if (self->endian == '<')
-                {
-                    value = byteswap(value);
-                }
-            }
-            else
-            {
-                if (self->endian == '>')
-                {
-                    value = byteswap(value);
-                }
-            }
-        }
+        handle_swap<EndianedBytesIO, T, endian>(self, value);
 
         PyObject *item = PyObject_FromAny(value);
         if (item == nullptr)
@@ -312,6 +252,360 @@ static PyObject *EndianedBytesIO_read_array_t(EndianedBytesIO *self, PyObject *a
         PyTuple_SetItem(ret, i, item); // Steal reference, no need to DECREF
     }
     return ret;
+}
+
+static inline bool _check_size(EndianedBytesIO *self, Py_ssize_t write_size)
+{
+    if (self->pos + write_size > self->view.len)
+    {
+        PyErr_SetString(PyExc_ValueError, "Write exceeds buffer length. (Resize not implemented)");
+        return true;
+        // self->view.obj can't be resized, as it's being used by the view
+        // -> needs a rewrite of the input handling logic
+    }
+    return false;
+}
+
+template <typename T, char endian>
+    requires(
+        EndianedReadable<T> &&
+        (endian == '<' || endian == '>' || endian == '|'))
+static PyObject *EndianedBytesIO_write_t(EndianedBytesIO *self, PyObject *arg)
+{
+    CHECK_CLOSED
+    if (self->view.readonly)
+    {
+        PyErr_SetString(PyExc_ValueError, "Buffer is not writable.");
+        return nullptr;
+    }
+
+    if (_check_size(self, sizeof(T)))
+    {
+        return nullptr; // Resize failed
+    }
+
+    T value{};
+    if (!PyObject_ToAny(arg, value))
+    {
+        return nullptr; // Conversion failed
+    }
+
+    handle_swap<EndianedBytesIO, T, endian>(self, value);
+
+    memcpy(static_cast<char *>(self->view.buf) + self->pos, &value, sizeof(T));
+    self->pos += sizeof(T);
+    return PyLong_FromLong(sizeof(T));
+}
+
+template <typename T, char endian>
+    requires(
+        EndianedReadable<T> &&
+        (endian == '<' || endian == '>' || endian == '|'))
+static PyObject *EndianedBytesIO_write_array_t(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
+{
+    CHECK_CLOSED
+    if (self->view.readonly)
+    {
+        PyErr_SetString(PyExc_ValueError, "Buffer is not writable.");
+        return nullptr;
+    }
+
+    static const char *kwlist[] = {
+        "v",
+        "write_count",
+        nullptr};
+
+    PyObject *v = nullptr;
+    PyObject *write_count_obj = Py_True; // Default to True
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O!",
+                                     const_cast<char **>(kwlist),
+                                     &v,
+                                     &PyBool_Type,
+                                     &write_count_obj))
+    {
+        return nullptr;
+    }
+
+    Py_ssize_t count = PyObject_Size(v);
+    if ((write_count_obj == Py_True) && EndianedIOBase_write_count(self, count))
+    {
+        return nullptr; // Resize failed
+    }
+    if (_check_size(self, count * sizeof(T)))
+    {
+        return nullptr; // Resize failed
+    }
+
+    PyObject *iter = PyObject_GetIter(v);
+    PyObject *item = PyIter_Next(iter);
+    T value{};
+    while (item)
+    {
+        if (!PyObject_ToAny(item, value))
+        {
+            Py_DecRef(iter);
+            return nullptr; // Conversion failed
+        }
+
+        handle_swap<EndianedBytesIO, T, endian>(self, value);
+
+        memcpy(static_cast<char *>(self->view.buf) + self->pos, &value, sizeof(T));
+        self->pos += sizeof(T);
+        Py_DecRef(item);
+        item = PyIter_Next(iter);
+    }
+    Py_DecRef(iter);
+    if (item == nullptr && PyErr_Occurred())
+    {
+        return nullptr; // Error occurred during iteration
+    }
+    return PyLong_FromSsize_t(count * sizeof(T));
+}
+
+static PyObject *EndianedBytesIO_write_cstring(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
+{
+    CHECK_CLOSED
+    if (self->view.readonly)
+    {
+        PyErr_SetString(PyExc_ValueError, "Buffer is not writable.");
+        return nullptr;
+    }
+
+    static const char *kwlist[] = {
+        "string",
+        "encoding",
+        "errors",
+        nullptr};
+    PyObject *v = nullptr;
+    const char *encoding = "utf-8";         // Default encoding
+    const char *errors = "surrogateescape"; // Default error handling
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|ss",
+                                     const_cast<char **>(kwlist),
+                                     &v,
+                                     &encoding,
+                                     &errors))
+    {
+        return nullptr;
+    }
+
+    PyObject *bytes = PyUnicode_AsEncodedString(v, encoding, errors);
+    if (bytes == nullptr)
+    {
+        return nullptr; // Encoding failed
+    }
+    Py_ssize_t write_size = PyBytes_GET_SIZE(bytes);
+    if (_check_size(self, write_size + 1)) // +1 for null terminator
+    {
+        Py_DecRef(bytes);
+        return nullptr; // Resize failed
+    }
+    memcpy(
+        static_cast<char *>(self->view.buf) + self->pos,
+        PyBytes_AS_STRING(bytes),
+        write_size);
+    Py_DecRef(bytes);
+
+    self->pos += write_size;
+    reinterpret_cast<char *>(self->view.buf)[self->pos++] = 0; // Null terminator
+    return PyLong_FromSsize_t(write_size + 1);
+}
+
+static PyObject *EndianedBytesIO_write_string(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
+{
+    CHECK_CLOSED
+    if (self->view.readonly)
+    {
+        PyErr_SetString(PyExc_ValueError, "Buffer is not writable.");
+        return nullptr;
+    }
+
+    static const char *kwlist[] = {
+        "string",
+        "write_count",
+        "encoding",
+        "errors",
+        nullptr};
+    PyObject *v = nullptr;
+    PyObject *write_count_obj = Py_True;
+    const char *encoding = "utf-8";         // Default encoding
+    const char *errors = "surrogateescape"; // Default error handling
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O!ss",
+                                     const_cast<char **>(kwlist),
+                                     &v,
+                                     &PyBool_Type,
+                                     &write_count_obj,
+                                     &encoding,
+                                     &errors))
+    {
+        return nullptr;
+    }
+
+    Py_ssize_t start_pos = self->pos;
+    Py_ssize_t string_size = PyUnicode_GET_LENGTH(v);
+    if ((write_count_obj == Py_True) && EndianedIOBase_write_count(self, string_size))
+    {
+        return nullptr; // Resize failed
+    }
+
+    PyObject *bytes = PyUnicode_AsEncodedString(v, encoding, errors);
+    if (bytes == nullptr)
+    {
+        return nullptr; // Encoding failed
+    }
+    Py_ssize_t bytes_size = PyBytes_GET_SIZE(bytes);
+    if (_check_size(self, bytes_size))
+    {
+        self->pos = start_pos;
+        Py_DecRef(bytes);
+        return nullptr; // Resize failed
+    }
+    memcpy(
+        static_cast<char *>(self->view.buf) + self->pos,
+        PyBytes_AS_STRING(bytes),
+        bytes_size);
+    Py_DecRef(bytes);
+
+    self->pos += bytes_size;
+    return PyLong_FromSsize_t(self->pos - start_pos);
+}
+
+static PyObject *EndianedBytesIO_write_bytes(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
+{
+    CHECK_CLOSED
+    if (self->view.readonly)
+    {
+        PyErr_SetString(PyExc_ValueError, "Buffer is not writable.");
+        return nullptr;
+    }
+
+    static const char *kwlist[] = {
+        "data",
+        "write_count",
+        nullptr};
+    Py_buffer v{};
+    PyObject *write_count_obj = Py_True;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s*|O!",
+                                     const_cast<char **>(kwlist),
+                                     &v,
+                                     &PyBool_Type,
+                                     &write_count_obj))
+    {
+        return nullptr;
+    }
+
+    Py_ssize_t start_pos = self->pos;
+    if ((write_count_obj == Py_True) && EndianedIOBase_write_count(self, v.len))
+    {
+        PyBuffer_Release(&v);
+        return nullptr; // Resize failed
+    }
+    if (_check_size(self, v.len))
+    {
+        self->pos = start_pos;
+        PyBuffer_Release(&v);
+        return nullptr; // Resize failed
+    }
+    memcpy(static_cast<char *>(self->view.buf) + self->pos, v.buf, v.len);
+    self->pos += v.len;
+    PyBuffer_Release(&v);
+    return PyLong_FromSsize_t(self->pos - start_pos);
+}
+
+static PyObject *EndianedBytesIO_write_varint(EndianedBytesIO *self, PyObject *arg)
+{
+    CHECK_CLOSED
+    if (self->view.readonly)
+    {
+        PyErr_SetString(PyExc_ValueError, "Buffer is not writable.");
+        return nullptr;
+    }
+
+    Py_ssize_t value = 0;
+    if (!PyArg_ParseTuple(arg, "n", &value))
+    {
+        return nullptr;
+    }
+    if (value < 0)
+    {
+        PyErr_SetString(PyExc_ValueError, "Varint must be non-negative.");
+        return nullptr;
+    }
+
+    // Calculate the number of bytes needed for the varint
+    Py_ssize_t write_size = 0;
+    uint64_t temp = value;
+    do
+    {
+        write_size++;
+        temp >>= 7;
+    } while (temp != 0);
+
+    if (_check_size(self, write_size))
+    {
+        return nullptr; // Resize failed
+    }
+
+    while (value > 0x7F)
+    {
+        uint8_t byte = static_cast<uint8_t>((value & 0x7F) | 0x80);
+        reinterpret_cast<uint8_t *>(self->view.buf)[self->pos++] = byte;
+        value >>= 7;
+    }
+
+    return PyLong_FromSsize_t(write_size);
+}
+
+static PyObject *EndianedBytesIO_write_varint_array(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
+{
+    CHECK_CLOSED
+    if (self->view.readonly)
+    {
+        PyErr_SetString(PyExc_ValueError, "Buffer is not writable.");
+        return nullptr;
+    }
+
+    static const char *kwlist[] = {
+        "v",
+        "write_count",
+        nullptr};
+
+    PyObject *v = nullptr;
+    PyObject *write_count_obj = Py_True; // Default to True
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O!",
+                                     const_cast<char **>(kwlist),
+                                     &v,
+                                     &PyBool_Type,
+                                     &write_count_obj))
+    {
+        return nullptr;
+    }
+
+    Py_ssize_t start_pos = self->pos;
+    Py_ssize_t count = PyObject_Size(v);
+    if ((write_count_obj == Py_True) && EndianedIOBase_write_count(self, count))
+    {
+        return nullptr; // Resize failed
+    }
+
+    PyObject *iter = PyObject_GetIter(v);
+    PyObject *item = PyIter_Next(iter);
+    while (item)
+    {
+        EndianedBytesIO_write_varint(self, item);
+        if (PyErr_Occurred())
+        {
+            self->pos = start_pos;
+            Py_DecRef(iter);
+            return nullptr; // Error occurred during write
+        }
+    }
+    Py_DecRef(iter);
+    return PyLong_FromSsize_t(self->pos - start_pos);
 }
 
 static PyObject *EndianedBytesIO_seek(EndianedBytesIO *self, PyObject *args)
@@ -491,8 +785,8 @@ static PyObject *EndianedBytesIO_read_cstring(EndianedBytesIO *self, PyObject *a
         "errors",
         nullptr};
 
-    char *encoding = "utf-8";         // Default encoding
-    char *errors = "surrogateescape"; // Default error handling
+    const char *encoding = "utf-8";         // Default encoding
+    const char *errors = "surrogateescape"; // Default error handling
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|ss",
                                      const_cast<char **>(kwlist),
@@ -523,8 +817,8 @@ static PyObject *EndianedBytesIO_read_string(EndianedBytesIO *self, PyObject *ar
         nullptr};
 
     PyObject *py_count = nullptr;
-    char *encoding = "utf-8";         // Default encoding
-    char *errors = "surrogateescape"; // Default error handling
+    const char *encoding = "utf-8";         // Default encoding
+    const char *errors = "surrogateescape"; // Default error handling
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oss",
                                      const_cast<char **>(kwlist),
@@ -708,41 +1002,47 @@ static PyObject *EndianedBytesIO_read_varint_array(EndianedBytesIO *self, PyObje
     return ret;
 }
 
-// PyObject *EndianedBytesIO_write(EndianedBytesIO *self, PyObject *arg)
-// {
-//     // CHECK_CLOSED
-//     // if (self->view.readonly)
-//     // {
-//     //     PyErr_SetString(PyExc_ValueError, "Buffer is not writable.");
-//     //     return nullptr;
-//     // }
-//     // Py_buffer view;
-//     // if (PyObject_GetBuffer(arg, &view, PyBUF_CONTIG_RO) == -1)
-//     // {
-//     //     return nullptr;
-//     // }
-//     // if (view.len == 0)
-//     // {
-//     //     PyBuffer_Release(&view);
-//     //     Py_RETURN_NONE;
-//     // }
-//     // if (self->pos + view.len > self->view.len)
-//     // {
-//     //     PyObject *buffer_object = self->view.obj;
+PyObject *EndianedBytesIO_write(EndianedBytesIO *self, PyObject *arg)
+{
+    CHECK_CLOSED
+    if (self->view.readonly)
+    {
+        PyErr_SetString(PyExc_ValueError, "Buffer is not writable.");
+        return nullptr;
+    }
+    Py_buffer view;
+    if (PyObject_GetBuffer(arg, &view, PyBUF_CONTIG_RO) == -1)
+    {
+        return nullptr;
+    }
+    if (view.len == 0)
+    {
+        PyBuffer_Release(&view);
+        Py_RETURN_NONE;
+    }
 
-//     //     _PyBytes_Resize(&buffer_object, self->pos + view.len);
-//     //     Py_buffer new_view{};
-//     //     PyObject_GetBuffer(buffer_object, &new_view, PyBUF_CONTIG);
-//     //     PyBuffer_Release(&self->view);
-//     //     PyErr_SetString(PyExc_ValueError, "Write exceeds buffer length.");
-//     //     PyBuffer_Release(&view);
-//     //     return nullptr;
-//     // }
-//     // memcpy(static_cast<char *>(self->view.buf) + self->pos, view.buf, view.len);
-//     // self->pos += view.len;
-//     // PyBuffer_Release(&view);
-//     // Py_RETURN_NONE;
-// }
+    if (_check_size(self, sizeof(view.len)))
+    {
+        return nullptr; // Resize failed
+    }
+    memcpy(static_cast<char *>(self->view.buf) + self->pos, view.buf, view.len);
+    self->pos += view.len;
+    PyObject *ret = PyLong_FromSsize_t(view.len);
+    PyBuffer_Release(&view);
+    return ret;
+}
+
+PyObject *EndianedBytesIO_writelines(EndianedBytesIO *self, PyObject *arg)
+{
+    CHECK_CLOSED
+    if (self->view.readonly)
+    {
+        PyErr_SetString(PyExc_ValueError, "Buffer is not writable.");
+        return nullptr;
+    }
+    PyErr_SetString(PyExc_NotImplementedError, "writelines() not implemented for EndianedBytesIO.");
+    return nullptr;
+}
 
 static PyMethodDef EndianedBytesIO_methods[] = {
     GENERATE_ENDIANEDIOBASE_BASE_FUNCTIONS(EndianedBytesIO),
@@ -755,6 +1055,9 @@ static PyMethodDef EndianedBytesIO_methods[] = {
     {"getvalue", reinterpret_cast<PyCFunction>(EndianedBytesIO_getValue), METH_NOARGS, "Get the current value of the buffer."},
     // reader endian based
     GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS(EndianedBytesIO),
+    // writer endian based
+    {"write", reinterpret_cast<PyCFunction>(EndianedBytesIO_write), METH_O, "Write bytes to the buffer."},
+    GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS(EndianedBytesIO),
     {"readuntil", reinterpret_cast<PyCFunction>(EndianedBytesIO_readuntil), METH_VARARGS, "Read until a delimiter."},
     {NULL} /* Sentinel */
 };

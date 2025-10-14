@@ -3,6 +3,7 @@
 #include <bit>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 #include "Python.h"
 #include "structmember.h"
@@ -201,31 +202,7 @@ static PyObject *EndianedStreamIO_read_t(EndianedStreamIO *self, PyObject *args)
     memcpy(&value, PyBytes_AsString(buffer), sizeof(T));
     Py_DecRef(buffer);
 
-    if constexpr ((endian == '<') && IS_BIG_ENDIAN_SYSTEM)
-    {
-        value = byteswap(value);
-    }
-    else if constexpr ((endian == '>') && !IS_BIG_ENDIAN_SYSTEM)
-    {
-        value = byteswap(value);
-    }
-    else if constexpr (sizeof(T) != 1)
-    {
-        if constexpr (IS_BIG_ENDIAN_SYSTEM)
-        {
-            if (self->endian == '<')
-            {
-                value = byteswap(value);
-            }
-        }
-        else
-        {
-            if (self->endian == '>')
-            {
-                value = byteswap(value);
-            }
-        }
-    }
+    handle_swap<EndianedStreamIO, T, endian>(self, value);
 
     return PyObject_FromAny(value);
 }
@@ -304,31 +281,7 @@ static PyObject *EndianedStreamIO_read_array_t(EndianedStreamIO *self, PyObject 
         T value = data[i];
         data += 1;
 
-        if constexpr ((endian == '<') && IS_BIG_ENDIAN_SYSTEM)
-        {
-            value = byteswap(value);
-        }
-        else if constexpr ((endian == '>') && !IS_BIG_ENDIAN_SYSTEM)
-        {
-            value = byteswap(value);
-        }
-        else if constexpr (sizeof(T) != 1)
-        {
-            if constexpr (IS_BIG_ENDIAN_SYSTEM)
-            {
-                if (self->endian == '<')
-                {
-                    value = byteswap(value);
-                }
-            }
-            else
-            {
-                if (self->endian == '>')
-                {
-                    value = byteswap(value);
-                }
-            }
-        }
+        handle_swap<EndianedStreamIO, T, endian>(self, value);
 
         PyObject *item = PyObject_FromAny(value);
         if (item == nullptr)
@@ -392,8 +345,8 @@ static PyObject *EndianedStreamIO_read_cstring(EndianedStreamIO *self, PyObject 
         "errors",
         nullptr};
 
-    char *encoding = "utf-8";         // Default encoding
-    char *errors = "surrogateescape"; // Default error handling
+    const char *encoding = "utf-8";         // Default encoding
+    const char *errors = "surrogateescape"; // Default error handling
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|ss",
                                      const_cast<char **>(kwlist),
@@ -503,8 +456,8 @@ static PyObject *EndianedStreamIO_read_string(EndianedStreamIO *self, PyObject *
         nullptr};
 
     PyObject *py_count = nullptr;
-    char *encoding = "utf-8";         // Default encoding
-    char *errors = "surrogateescape"; // Default error handling
+    const char *encoding = "utf-8";         // Default encoding
+    const char *errors = "surrogateescape"; // Default error handling
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oss",
                                      const_cast<char **>(kwlist),
@@ -601,8 +554,333 @@ static PyObject *EndianedStreamIO_read_varint_array(EndianedStreamIO *self, PyOb
     return ret;
 }
 
+template <typename T, char endian>
+    requires(
+        EndianedReadable<T> &&
+        (endian == '<' || endian == '>' || endian == '|'))
+static PyObject *EndianedStreamIO_write_t(EndianedStreamIO *self, PyObject *arg)
+{
+    T value{};
+    if (!PyObject_ToAny(arg, value))
+    {
+        return nullptr; // Conversion failed
+    }
+
+    handle_swap<EndianedStreamIO, T, endian>(self, value);
+    PyObject *buffer = PyBytes_FromStringAndSize(reinterpret_cast<const char *>(&value), sizeof(T));
+    if (buffer == nullptr)
+    {
+        return nullptr;
+    }
+
+    PyObject *result = PyObject_CallMethod(self->write, "write", "O", buffer);
+    Py_DecRef(buffer);
+    return result;
+}
+
+template <typename T, char endian>
+    requires(
+        EndianedReadable<T> &&
+        (endian == '<' || endian == '>' || endian == '|'))
+static PyObject *EndianedStreamIO_write_array_t(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
+{
+    static const char *kwlist[] = {
+        "v",
+        "write_count",
+        nullptr};
+
+    PyObject *v = nullptr;
+    PyObject *write_count_obj = Py_True; // Default to True
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O!",
+                                     const_cast<char **>(kwlist),
+                                     &v,
+                                     &PyBool_Type,
+                                     &write_count_obj))
+    {
+        return nullptr;
+    }
+
+    Py_ssize_t count = PyObject_Size(v);
+    if ((write_count_obj == Py_True) && EndianedIOBase_write_count(self, count))
+    {
+        return nullptr; // Resize failed
+    }
+
+    PyObject *iter = PyObject_GetIter(v);
+    PyObject *item = PyIter_Next(iter);
+    T value{};
+    while (item)
+    {
+        if (!PyObject_ToAny(item, value))
+        {
+            Py_DecRef(iter);
+            return nullptr; // Conversion failed
+        }
+
+        handle_swap<EndianedStreamIO, T, endian>(self, value);
+
+        PyObject *buffer = PyBytes_FromStringAndSize(reinterpret_cast<const char *>(&value), sizeof(T));
+        if (buffer == nullptr)
+        {
+            Py_DecRef(item);
+            Py_DecRef(iter);
+            return nullptr;
+        }
+
+        PyObject *result = PyObject_CallMethod(self->write, "write", "O", buffer);
+
+        Py_DecRef(buffer);
+        Py_DecRef(item);
+        item = PyIter_Next(iter);
+    }
+    Py_DecRef(iter);
+
+    return PyLong_FromSsize_t(count * sizeof(T));
+}
+
+static PyObject *EndianedStreamIO_write_cstring(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
+{
+    static const char *kwlist[] = {
+        "string",
+        "encoding",
+        "errors",
+        nullptr};
+
+    const char *encoding = "utf-8";         // Default encoding
+    const char *errors = "surrogateescape"; // Default error handling
+    PyObject *s = nullptr;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|ss",
+                                     const_cast<char **>(kwlist),
+                                     &s,
+                                     &encoding,
+                                     &errors))
+    {
+        return nullptr;
+    }
+
+    if (!PyUnicode_Check(s))
+    {
+        PyErr_SetString(PyExc_TypeError, "Argument must be a string.");
+        return nullptr;
+    }
+
+    PyObject *bytes = PyUnicode_AsEncodedString(s, encoding, errors);
+    if (bytes == nullptr)
+    {
+        return nullptr;
+    }
+
+    // Create a new bytes object with an extra null terminator
+    Py_ssize_t size = PyBytes_Size(bytes);
+    PyObject *bytes_with_null = PyBytes_FromStringAndSize(nullptr, size + 1);
+    if (bytes_with_null == nullptr)
+    {
+        Py_DecRef(bytes);
+        return nullptr;
+    }
+
+    // Copy the original bytes and add the null terminator
+    memcpy(PyBytes_AsString(bytes_with_null), PyBytes_AsString(bytes), size);
+    PyBytes_AsString(bytes_with_null)[size] = '\0';
+
+    Py_DecRef(bytes);
+
+    // Write the bytes with null terminator to the stream
+    PyObject *result = PyObject_CallMethod(self->write, "write", "O", bytes_with_null);
+    Py_DecRef(bytes_with_null);
+    return result;
+}
+
+static PyObject *EndianedStreamIO_write_string(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
+{
+    static const char *kwlist[] = {
+        "string",
+        "write_count",
+        "encoding",
+        "errors",
+        nullptr};
+
+    const char *encoding = "utf-8";         // Default encoding
+    const char *errors = "surrogateescape"; // Default error handling
+    PyObject *s = nullptr;
+    PyObject *write_count_obj = Py_False; // Default to False
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O!ss",
+                                     const_cast<char **>(kwlist),
+                                     &s,
+                                     &write_count_obj,
+                                     &encoding,
+                                     &errors))
+    {
+        return nullptr;
+    }
+    Py_ssize_t string_size = PyUnicode_GetLength(s);
+    if ((write_count_obj == Py_True) && EndianedIOBase_write_count(self, string_size))
+    {
+        return nullptr; // Resize failed
+    }
+
+    PyObject *bytes = PyUnicode_AsEncodedString(s, encoding, errors);
+    if (bytes == nullptr)
+    {
+        return nullptr;
+    }
+
+    // Write the bytes to the stream
+    PyObject *result = PyObject_CallMethod(self->write, "write", "O", bytes);
+    Py_DecRef(bytes);
+    return result;
+}
+
+static PyObject *EndianedStreamIO_write_bytes(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
+{
+    static const char *kwlist[] = {
+        "data",
+        "write_count",
+        nullptr};
+    Py_buffer v{};
+    PyObject *write_count_obj = Py_True;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s*|O!",
+                                     const_cast<char **>(kwlist),
+                                     &v,
+                                     &PyBool_Type,
+                                     &write_count_obj))
+    {
+        return nullptr;
+    }
+
+    if ((write_count_obj == Py_True) && EndianedIOBase_write_count(self, v.len))
+    {
+        PyBuffer_Release(&v);
+        return nullptr; // Resize failed
+    }
+
+    return PyObject_CallMethod(self->write, "write", "O", v.obj);
+}
+
+static PyObject *EndianedStreamIO_write_varint(EndianedStreamIO *self, PyObject *arg)
+{
+    Py_ssize_t value = 0;
+    if (!PyArg_ParseTuple(arg, "n", &value))
+    {
+        return nullptr;
+    }
+    if (value < 0)
+    {
+        PyErr_SetString(PyExc_ValueError, "Varint must be non-negative.");
+        return nullptr;
+    }
+
+    // Create a bytes object to hold the varint
+    char buffer[10]; // Varint can be at most 10 bytes for 64-bit integers
+    int index = 0;
+
+    // Encode the integer as a varint
+    do
+    {
+        uint8_t byte = value & 0x7F; // Get the lowest 7 bits
+        value >>= 7;                 // Shift right by 7 bits
+        if (value != 0)
+        {
+            byte |= 0x80; // Set the continuation bit if there are more bytes
+        }
+        buffer[index++] = static_cast<char>(byte);
+    } while (value != 0 && index < sizeof(buffer));
+
+    // Write the varint to the stream
+    PyObject *py_buffer = PyBytes_FromStringAndSize(buffer, index);
+    if (py_buffer == nullptr)
+    {
+        return nullptr;
+    }
+    PyObject *result = PyObject_CallMethod(self->write, "write", "O", py_buffer);
+    Py_DecRef(py_buffer);
+    return result;
+}
+
+static PyObject *EndianedStreamIO_write_varint_array(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
+{
+    static const char *kwlist[] = {
+        "v",
+        "write_count",
+        nullptr};
+
+    PyObject *v = nullptr;
+    PyObject *write_count_obj = Py_True; // Default to True
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O!",
+                                     const_cast<char **>(kwlist),
+                                     &v,
+                                     &PyBool_Type,
+                                     &write_count_obj))
+    {
+        return nullptr;
+    }
+
+    Py_ssize_t count = PyObject_Size(v);
+    if ((write_count_obj == Py_True) && EndianedIOBase_write_count(self, count))
+    {
+        return nullptr; // Resize failed
+    }
+
+    PyObject *iter = PyObject_GetIter(v);
+    PyObject *item = PyIter_Next(iter);
+
+    std::vector<uint8_t> buffer(count * 3);
+    uint8_t *buf_ptr = buffer.data();
+    uint8_t *buf_end = buffer.data() + buffer.size();
+    while (item)
+    {
+        // Encode the integer as a varint
+        Py_ssize_t value = PyLong_AsSsize_t(item);
+        if (value < 0)
+        {
+            PyErr_SetString(PyExc_ValueError, "Varint must be non-negative.");
+            Py_DecRef(item);
+            Py_DecRef(iter);
+            return nullptr;
+        }
+        do
+        {
+            uint8_t byte = value & 0x7F; // Get the lowest 7 bits
+            value >>= 7;                 // Shift right by 7 bits
+            if (value != 0)
+            {
+                byte |= 0x80; // Set the continuation bit if there are more bytes
+            }
+            *buf_ptr++ = (byte);
+        } while (value != 0);
+
+        if ((buf_end - buf_ptr) < 64)
+        {
+            size_t current_pos = buf_ptr - buffer.data();
+            buffer.resize(buffer.size() * 2);
+            buf_ptr = buffer.data() + current_pos;
+            buf_end = buffer.data() + buffer.size();
+        }
+        Py_DecRef(item);
+    }
+    Py_DecRef(iter);
+
+    PyObject *py_buffer = PyBytes_FromStringAndSize(reinterpret_cast<const char *>(buffer.data()), buf_ptr - buffer.data());
+    if (py_buffer == nullptr)
+    {
+        Py_DecRef(item);
+        return nullptr;
+    }
+    PyObject *result = PyObject_CallMethod(self->write, "write", "O", py_buffer);
+    Py_DecRef(py_buffer);
+    Py_DecRef(iter);
+
+    return result;
+}
+
 PyMethodDef EndianedStreamIO_methods[] = {
     GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS(EndianedStreamIO),
+    GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS(EndianedStreamIO),
     {"align",
      (PyCFunction)EndianedStreamIO_align,
      METH_O,

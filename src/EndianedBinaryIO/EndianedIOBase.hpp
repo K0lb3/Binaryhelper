@@ -1,4 +1,6 @@
 #pragma once
+#include "PyConverter.hpp"
+
 #define u8 uint8_t
 #define u16 uint16_t
 #define u32 uint32_t
@@ -75,30 +77,34 @@
         {"seekable", reinterpret_cast<PyCFunction>(EndianedIOClass##_seekable), METH_NOARGS, "Check if the buffer is seekable."},        \
         {"readline", reinterpret_cast<PyCFunction>(EndianedIOClass##_readline), METH_VARARGS, "Read a line from the buffer."},           \
         {"readlines", reinterpret_cast<PyCFunction>(EndianedIOClass##_readlines), METH_VARARGS, "Read multiple lines from the buffer."}, \
-        {"align", reinterpret_cast<PyCFunction>(EndianedIOClass##_align), METH_O, "Align the position of the buffer."}
+        {"align", reinterpret_cast<PyCFunction>(EndianedIOClass##_align), METH_O, "Align the position of the buffer."},                  \
+        {"write", reinterpret_cast<PyCFunction>(EndianedIOClass##_write), METH_O, "Write bytes to the buffer."},                         \
+        {"writelines", reinterpret_cast<PyCFunction>(EndianedIOClass##_writelines), METH_O, "Write multiple lines to the buffer."}
 
-// #define _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, T)                                                               \
-//     {"write_" #T, reinterpret_cast<PyCFunction>(EndianedIOClass_write_t<T, '|'>), METH_O, "Write a " #T " value."},                             \
-//         {"write_" #T "_le", reinterpret_cast<PyCFunction>(EndianedIOClass_write_t<T, '<'>), METH_O, "Write a " #T " value."},                   \
-//         {"write_" #T "_be", reinterpret_cast<PyCFunction>(EndianedIOClass_write_t<T, '>'>), METH_O, "Write a " #T " value."},                   \
-//         {"write_" #T "_array", reinterpret_cast<PyCFunction>(EndianedBytesIO_write_array_t<T, '|'>), METH_VARARGS, "Write a " #T " array."},    \
-//         {"write_" #T "_le_array", reinterpret_cast<PyCFunction>(EndianedBytesIO_write_array_t<T, '<'>), METH_VARARGS, "Write a " #T " array."}, \
-//         {"write_" #T "_be_array", reinterpret_cast<PyCFunction>(EndianedBytesIO_write_array_t<T, '>'>), METH_VARARGS, "Write a " #T " array."}
+#define _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, T)                                                                                        \
+    {"write_" #T, reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<T, '|'>), METH_O, "Write a " #T " value."},                                            \
+        {"write_" #T "_le", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<T, '<'>), METH_O, "Write a " #T " value."},                                  \
+        {"write_" #T "_be", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<T, '>'>), METH_O, "Write a " #T " value."},                                  \
+        {"write_" #T "_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<T, '|'>), METH_VARARGS | METH_KEYWORDS, "Write a " #T " array."},    \
+        {"write_" #T "_le_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<T, '<'>), METH_VARARGS | METH_KEYWORDS, "Write a " #T " array."}, \
+        {"write_" #T "_be_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<T, '>'>), METH_VARARGS | METH_KEYWORDS, "Write a " #T " array."}
 
-// #define GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS(EndianedIOClass_write_t)                                                                        \
-//     {"write_u8", reinterpret_cast<PyCFunction>(EndianedIOClass_write_t<u8, '|'>), METH_O, "Write a u8 value."},                       \
-//         {"write_u8_array", reinterpret_cast<PyCFunction>(EndianedBytesIO_write_array_t<u8, '|'>), METH_VARARGS, "Write a u8 array."}, \
-//         {"write_i8", reinterpret_cast<PyCFunction>(EndianedIOClass_write_t<i8, '|'>), METH_O, "Write an i8 value."},                    \
-//         {"write_i8_array", reinterpret_cast<PyCFunction>(EndianedBytesIO_write_array_t<i8, '|'>), METH_VARARGS, "Write an i8 array."},  \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, u16),                                                       \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, u32),                                                       \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, u64),                                                       \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, i16),                                                        \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, i32),                                                        \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, i64),                                                        \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, f16),                                                           \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, f32),                                                          \
-//         _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass_write_t, f64)
+#define GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS(EndianedIOClass)                                                                                    \
+    {"write_u8", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<u8, '|'>), METH_O, "Write a u8 value."},                                   \
+        {"write_i8", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<i8, '|'>), METH_O, "Write an i8 value."},                              \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, u16),                                                                        \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, u32),                                                                        \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, u64),                                                                        \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, i16),                                                                        \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, i64),                                                                        \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, f16),                                                                        \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, f32),                                                                        \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, f64),                                                                        \
+        {"write_cstring", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_cstring), METH_VARARGS | METH_KEYWORDS, "Write a C-style string."}, \
+        {"write_string", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_string), METH_VARARGS | METH_KEYWORDS, "Write a string."},           \
+        {"write_bytes", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_bytes), METH_O, "Write a byte array."},                               \
+        {"write_varint", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_varint), METH_O, "Write a variable-length integer."},                \
+        {"write_varint_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_varint_array), METH_VARARGS | METH_KEYWORDS, "Write a variable-length integer array."}
 
 template <typename T>
 concept EndianedIOConfig = requires {
@@ -137,4 +143,27 @@ static PyType_Spec createPyTypeSpec(
         Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
         slots,
     };
+}
+
+static inline bool EndianedIOBase_write_count(PyObject *self, Py_ssize_t size)
+{
+    PyObject *res = PyObject_CallMethod(
+        self,
+        "write_count",
+        "n",
+        size,
+        nullptr);
+
+    if (res == nullptr)
+    {
+        return true; // Resize failed
+    }
+    Py_DecRef(res);
+    return false; // Resize succeeded
+}
+
+template <typename T>
+static inline bool EndianedIOBase_write_count(T *self, Py_ssize_t size)
+{
+    return EndianedIOBase_write_count(reinterpret_cast<PyObject *>(self), size);
 }

@@ -226,8 +226,7 @@ static PyObject *EndianedIOBase_read_array_t(PyObject *self, PyObject *arg)
 }
 
 PyMethodDef EndianedIOBase_methods[] = {
-    GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS(EndianedIOBase_read_t),
-    GENERATE_ENDIANEDIOBASE_READ_ARRAY_FUNCTIONS(EndianedIOBase_read_array_t),
+    GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS(EndianedIOBase),
     {NULL} /* Sentinel */
 };
 
