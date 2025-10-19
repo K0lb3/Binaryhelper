@@ -210,7 +210,7 @@ static inline bool _read_count(
     PyObject *py_count,
     Py_ssize_t &count)
 {
-    if (py_count == Py_None)
+    if ((py_count == nullptr) || (py_count == Py_None))
     {
         PyObject *py_count = PyObject_CallMethod(
             reinterpret_cast<PyObject *>(self),
@@ -237,6 +237,10 @@ static inline bool _read_count(
         if (count < 0)
         {
             PyErr_SetString(PyExc_ValueError, "Invalid size argument.");
+            return false;
+        }
+        else if (PyErr_Occurred())
+        {
             return false;
         }
         return true;
@@ -275,7 +279,6 @@ static PyObject *EndianedStreamIO_read_array_t(EndianedStreamIO *self, PyObject 
     {
 
         T value = data[i];
-        data += 1;
 
         handle_swap<EndianedStreamIO, T, endian>(self, value);
 
