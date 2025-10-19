@@ -187,7 +187,7 @@ class StringNode(TypeNode[str]):
     def write_to(self, value, writer, context=None):
         if self.size_node is None:
             # C-style string
-            return writer.write_string_c(value)
+            return writer.write_cstring(value)
         else:
             # Length-prefixed string
             encoded_value = value.encode(self.encoding, self.errors)

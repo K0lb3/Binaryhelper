@@ -1,5 +1,7 @@
 from struct import Struct
 
+BOOL = Struct("?")
+
 # unsigned integers
 U8 = Struct("B")
 U16 = Struct("H")

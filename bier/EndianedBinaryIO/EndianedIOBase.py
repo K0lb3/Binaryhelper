@@ -5,6 +5,7 @@ from struct import pack as struct_pack
 from typing import Literal, Optional, Sequence, Tuple
 
 from ._structs import (
+    BOOL,
     F16_BE,
     F16_LE,
     F32_BE,
@@ -45,6 +46,16 @@ class EndianedReaderIOBase(IOBase, metaclass=abc.ABCMeta):
             else:
                 self.read(padding)
         return self.tell()
+
+    # bool
+    def read_bool(self) -> bool:
+        return BOOL.unpack(self.read(1))[0]
+
+    def read_bool_array(self, count: Optional[int] = None) -> Tuple[bool, ...]:
+        if count is None:
+            count = self.read_count()
+        struct = Struct(f"{count}?")
+        return struct.unpack(self.read(struct.size))
 
     # unsigned integer
     def read_u8(self) -> int:
@@ -448,6 +459,15 @@ class EndianedWriterIOBase(IOBase, metaclass=abc.ABCMeta):
     def write_count(self, count: int) -> int:
         return self.write_i32(count)
 
+    # bool
+    def write_bool(self, v: bool) -> int:
+        return self.write(BOOL.pack(v))
+
+    def write_bool_array(self, v: Sequence[bool], write_count: bool = True) -> int:
+        if write_count:
+            self.write_count(len(v))
+        return self.write(struct_pack(f"{len(v)}?", *v))
+
     # unsigned integer
     def write_u8(self, v: int) -> int:
         return self.write(U8.pack(v))
@@ -729,7 +749,7 @@ class EndianedWriterIOBase(IOBase, metaclass=abc.ABCMeta):
         return self.write(struct_pack(f">{len(v)}d", *v))
 
     # strings
-    def write_string_c(
+    def write_cstring(
         self, string: str, encoding: str = "utf-8", errors="surrogateescape"
     ) -> int:
         """Write a null-terminated string to the stream.

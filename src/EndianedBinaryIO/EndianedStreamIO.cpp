@@ -619,7 +619,12 @@ static PyObject *EndianedStreamIO_write_array_t(EndianedStreamIO *self, PyObject
 
     PyObject *iter = PyObject_GetIter(v);
     PyObject *item = PyIter_Next(iter);
-    std::vector<T> buffer(count);
+
+    // Use uint8_t for bool to avoid std::vector<bool> specialization issues
+    using BufferType = std::conditional_t<std::is_same_v<T, bool>, uint8_t, T>;
+    std::vector<BufferType> buffer;
+    buffer.reserve(count);
+
     while (item)
     {
         T value{};
@@ -629,13 +634,13 @@ static PyObject *EndianedStreamIO_write_array_t(EndianedStreamIO *self, PyObject
             return nullptr; // Conversion failed
         }
         handle_swap<EndianedStreamIO, T, endian>(self, value);
-        buffer.push_back(value);
+        buffer.push_back(static_cast<BufferType>(value));
         Py_DecRef(item);
         item = PyIter_Next(iter);
     }
     Py_DecRef(iter);
 
-    return _EndianedStreamIO_write_raw(self, buffer.data(), buffer.size() * sizeof(T));
+    return _EndianedStreamIO_write_raw(self, buffer.data(), buffer.size() * sizeof(BufferType));
 }
 
 static PyObject *EndianedStreamIO_write_cstring(EndianedStreamIO *self, PyObject *args, PyObject *kwds)

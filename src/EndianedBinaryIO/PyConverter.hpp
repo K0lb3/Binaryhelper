@@ -19,6 +19,7 @@ template <class _Ty>
     requires std::is_integral_v<_Ty> ||
              std::is_floating_point_v<_Ty> ||
              std::is_same_v<_Ty, half> ||
+             std::is_same_v<_Ty, bool> ||
              std::is_trivially_copyable_v<_Ty>
 constexpr _Ty byteswap(const _Ty _Val) noexcept
 {
@@ -41,6 +42,7 @@ constexpr _Ty byteswap(const _Ty _Val) noexcept
     else
     {
         static_assert(sizeof(_Ty) == 2 || sizeof(_Ty) == 4 || sizeof(_Ty) == 8, "Unsupported type size for byteswap.");
+        return _Val;
     }
 }
 
@@ -49,6 +51,7 @@ concept EndianedReadable =
     std::is_integral_v<T> ||
     std::is_floating_point_v<T> ||
     std::is_same_v<T, half> ||
+    std::is_same_v<T, bool> ||
     requires(T value) {
         { byteswap(value) } -> std::same_as<T>;
         { PyObject_FromAny(value) } -> std::convertible_to<PyObject *>;
@@ -71,7 +74,7 @@ concept EndianedReadable =
  * @warning For half-precision values, no error checking is performed on PyFloat_Unpack2
  */
 template <typename T>
-    requires std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<T, half>
+    requires std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<T, half> || std::is_same_v<T, bool>
 inline PyObject *PyObject_FromAny(T &value)
 {
     using std::is_same_v;
@@ -103,6 +106,10 @@ inline PyObject *PyObject_FromAny(T &value)
     {
         return PyFloat_FromDouble(value);
     }
+    else if constexpr (is_same_v<T, bool>)
+    {
+        return PyBool_FromLong(static_cast<long>(value));
+    }
 }
 
 /**
@@ -120,7 +127,7 @@ inline PyObject *PyObject_FromAny(T &value)
  * @return true if conversion succeeded, false otherwise
  */
 template <typename T>
-    requires std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<T, half>
+    requires std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<T, half> || std::is_same_v<T, bool>
 inline bool PyObject_ToAny(PyObject *obj, T &out)
 {
     using std::is_same_v;
@@ -177,6 +184,14 @@ inline bool PyObject_ToAny(PyObject *obj, T &out)
         if (PyErr_Occurred())
             return false;
         out = val;
+        return true;
+    }
+    else if constexpr (is_same_v<T, bool>)
+    {
+        long val = PyObject_IsTrue(obj);
+        if (val == -1)
+            return false;
+        out = static_cast<bool>(val);
         return true;
     }
     return false;
