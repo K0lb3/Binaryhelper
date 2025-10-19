@@ -377,7 +377,7 @@ class EndianedReaderIOBase(IOBase, metaclass=abc.ABCMeta):
         string = b""
         while True:
             char = self.read(1)
-            if char == b"\x00":
+            if not char or char == b"\x00":
                 break
             string += char
         return string.decode("utf-8", errors=errors)
