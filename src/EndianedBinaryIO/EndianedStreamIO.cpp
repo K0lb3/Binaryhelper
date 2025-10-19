@@ -185,9 +185,7 @@ inline PyObject *_read_buffer(EndianedStreamIO *self, const Py_ssize_t size)
 }
 
 template <typename T, char endian>
-    requires(
-        EndianedReadable<T> &&
-        (endian == '<' || endian == '>' || endian == '|'))
+    requires EndianedOperation<T, endian>
 static PyObject *EndianedStreamIO_read_t(EndianedStreamIO *self, PyObject *args)
 {
     PyObject *buffer = _read_buffer(self, sizeof(T));
@@ -249,9 +247,7 @@ static inline bool _read_count(
 }
 
 template <typename T, char endian>
-    requires(
-        EndianedReadable<T> &&
-        (endian == '<' || endian == '>' || endian == '|'))
+    requires EndianedOperation<T, endian>
 static PyObject *EndianedStreamIO_read_array_t(EndianedStreamIO *self, PyObject *arg)
 {
     Py_ssize_t size = 0;
@@ -573,9 +569,7 @@ inline PyObject *_EndianedStreamIO_write_raw(EndianedStreamIO *self, T *data, co
 }
 
 template <typename T, char endian>
-    requires(
-        EndianedReadable<T> &&
-        (endian == '<' || endian == '>' || endian == '|'))
+    requires EndianedOperation<T, endian>
 static PyObject *EndianedStreamIO_write_t(EndianedStreamIO *self, PyObject *arg)
 {
     T value{};
@@ -589,9 +583,7 @@ static PyObject *EndianedStreamIO_write_t(EndianedStreamIO *self, PyObject *arg)
 }
 
 template <typename T, char endian>
-    requires(
-        EndianedReadable<T> &&
-        (endian == '<' || endian == '>' || endian == '|'))
+    requires EndianedOperation<T, endian>
 static PyObject *EndianedStreamIO_write_array_t(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
 {
     static const char *kwlist[] = {

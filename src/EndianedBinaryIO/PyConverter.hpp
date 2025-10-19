@@ -10,52 +10,52 @@
 #include <bit>
 #include <concepts>
 #include <cstdint>
+#include <type_traits>
 #include <Python.h>
 #include "./PyFloat_Half.hpp"
 
 constexpr bool IS_BIG_ENDIAN_SYSTEM = (std::endian::native == std::endian::big);
 
-template <class _Ty>
-    requires std::is_integral_v<_Ty> ||
-             std::is_floating_point_v<_Ty> ||
-             std::is_same_v<_Ty, half> ||
-             std::is_same_v<_Ty, bool> ||
-             std::is_trivially_copyable_v<_Ty>
-constexpr _Ty byteswap(const _Ty _Val) noexcept
+// A single concept for the scalar types this module supports
+template <typename T>
+concept EndianedSupportedType =
+    std::is_integral_v<std::remove_cvref_t<T>> ||
+    std::is_floating_point_v<std::remove_cvref_t<T>> ||
+    std::is_same_v<std::remove_cvref_t<T>, half> ||
+    std::is_same_v<std::remove_cvref_t<T>, bool>;
+
+// Concept for valid endian-aware operations
+template <typename T, char endian>
+concept EndianedOperation = EndianedSupportedType<T> &&
+                            (endian == '<' || endian == '>' || endian == '|');
+
+template <typename T>
+    requires EndianedSupportedType<T> ||
+             std::is_trivially_copyable_v<T>
+constexpr T byteswap(const T value) noexcept
 {
-    if constexpr (std::is_integral_v<_Ty>)
+    if constexpr (std::is_integral_v<T>)
     {
-        return std::byteswap(_Val);
+        return std::byteswap(value);
     }
-    else if constexpr (sizeof(_Ty) == 2)
+    else if constexpr (sizeof(T) == 2)
     {
-        return std::bit_cast<_Ty>(std::byteswap(std::bit_cast<uint16_t>(_Val)));
+        return std::bit_cast<T>(std::byteswap(std::bit_cast<uint16_t>(value)));
     }
-    else if constexpr (sizeof(_Ty) == 4)
+    else if constexpr (sizeof(T) == 4)
     {
-        return std::bit_cast<_Ty>(std::byteswap(std::bit_cast<uint32_t>(_Val)));
+        return std::bit_cast<T>(std::byteswap(std::bit_cast<uint32_t>(value)));
     }
-    else if constexpr (sizeof(_Ty) == 8)
+    else if constexpr (sizeof(T) == 8)
     {
-        return std::bit_cast<_Ty>(std::byteswap(std::bit_cast<uint64_t>(_Val)));
+        return std::bit_cast<T>(std::byteswap(std::bit_cast<uint64_t>(value)));
     }
     else
     {
-        static_assert(sizeof(_Ty) == 2 || sizeof(_Ty) == 4 || sizeof(_Ty) == 8, "Unsupported type size for byteswap.");
-        return _Val;
+        static_assert(sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "Unsupported type size for byteswap.");
+        return value;
     }
 }
-
-template <typename T>
-concept EndianedReadable =
-    std::is_integral_v<T> ||
-    std::is_floating_point_v<T> ||
-    std::is_same_v<T, half> ||
-    std::is_same_v<T, bool> ||
-    requires(T value) {
-        { byteswap(value) } -> std::same_as<T>;
-        { PyObject_FromAny(value) } -> std::convertible_to<PyObject *>;
-    };
 
 /**
  * @brief Converts a C++ value to a Python object.
@@ -74,7 +74,7 @@ concept EndianedReadable =
  * @warning For half-precision values, no error checking is performed on PyFloat_Unpack2
  */
 template <typename T>
-    requires std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<T, half> || std::is_same_v<T, bool>
+    requires EndianedSupportedType<T>
 inline PyObject *PyObject_FromAny(T &value)
 {
     using std::is_same_v;
@@ -127,7 +127,7 @@ inline PyObject *PyObject_FromAny(T &value)
  * @return true if conversion succeeded, false otherwise
  */
 template <typename T>
-    requires std::is_integral_v<T> || std::is_floating_point_v<T> || std::is_same_v<T, half> || std::is_same_v<T, bool>
+    requires EndianedSupportedType<T>
 inline bool PyObject_ToAny(PyObject *obj, T &out)
 {
     using std::is_same_v;
@@ -206,8 +206,7 @@ concept EndianedIOHandler =
 template <typename EI, typename T, char endian>
     requires(
         EndianedIOHandler<EI> &&
-        EndianedReadable<T> &&
-        (endian == '<' || endian == '>' || endian == '|'))
+        EndianedOperation<T, endian>)
 static inline void handle_swap(EI *self, T &value)
 {
     if constexpr ((endian == '<') && IS_BIG_ENDIAN_SYSTEM)

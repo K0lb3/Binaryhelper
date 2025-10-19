@@ -43,9 +43,7 @@ inline PyObject *_read_buffer(PyObject *self, const Py_ssize_t size)
 }
 
 template <typename T, char endian>
-    requires(
-        EndianedReadable<T> &&
-        (endian == '<' || endian == '>' || endian == '|'))
+    requires EndianedOperation<T, endian>
 static PyObject *EndianedIOBase_read_t(PyObject *self, PyObject *args)
 {
     PyObject *buffer = _read_buffer(self, sizeof(T));
@@ -106,9 +104,7 @@ static PyObject *EndianedIOBase_read_t(PyObject *self, PyObject *args)
 }
 
 template <typename T, char endian>
-    requires(
-        EndianedReadable<T> &&
-        (endian == '<' || endian == '>' || endian == '|'))
+    requires EndianedOperation<T, endian>
 static PyObject *EndianedIOBase_read_array_t(PyObject *self, PyObject *arg)
 {
     Py_ssize_t size = 0;
