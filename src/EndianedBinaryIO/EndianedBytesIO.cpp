@@ -195,7 +195,7 @@ static inline bool _read_count(EndianedBytesIO *self, PyObject *py_count, Py_ssi
     else if (PyLong_Check(py_count))
     {
         count = PyLong_AsSsize_t(py_count);
-        if ((count < 0))
+        if (count < 0)
         {
             PyErr_SetString(PyExc_ValueError, "Invalid size argument.");
             return false;
