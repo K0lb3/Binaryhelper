@@ -1,12 +1,14 @@
+import builtins
 from random import randint, uniform
 from struct import pack, unpack
-from typing import Callable, Literal, List
+from typing import Callable, List, Literal
 
 from bier.EndianedBinaryIO import EndianedReaderIOBase, EndianedWriterIOBase, Endianess
 
 
 class EndianedIOTestHelper:
     count: int
+    bool: List[builtins.bool]
     u8: List[int]
     u16: List[int]
     u32: List[int]
@@ -62,6 +64,7 @@ class EndianedIOTestHelper:
         instance = reader_gen(
             b"".join(
                 [
+                    self.raw_bool_le,
                     self.raw_u8_le,
                     self.raw_u16_le,
                     self.raw_u32_le,
@@ -77,6 +80,7 @@ class EndianedIOTestHelper:
             ),
             "<",
         )
+        self._test_read(instance, "read_bool", self.bool, self.raw_bool_le)
         self._test_read(instance, "read_u8", self.u8, self.raw_u8_le)
         self._test_read(instance, "read_u16", self.u16, self.raw_u16_le)
         self._test_read(instance, "read_u32", self.u32, self.raw_u32_le)
@@ -96,6 +100,7 @@ class EndianedIOTestHelper:
         instance = reader_gen(
             b"".join(
                 [
+                    self.raw_bool_be,
                     self.raw_u8_be,
                     self.raw_u16_be,
                     self.raw_u32_be,
@@ -111,6 +116,7 @@ class EndianedIOTestHelper:
             ),
             ">",
         )
+        self._test_read(instance, "read_bool", self.bool, self.raw_bool_be)
         self._test_read(instance, "read_u8", self.u8, self.raw_u8_be)
         self._test_read(instance, "read_u16", self.u16, self.raw_u16_be)
         self._test_read(instance, "read_u32", self.u32, self.raw_u32_be)
@@ -126,6 +132,7 @@ class EndianedIOTestHelper:
 
     def _test_writer_le(self, writer_gen: Callable[[Endianess], EndianedWriterIOBase]):
         instance = writer_gen("<")
+        self._test_write(instance, "write_bool", self.bool, self.raw_bool_le)
         self._test_write(instance, "write_u8", self.u8, self.raw_u8_le)
         self._test_write(instance, "write_u16", self.u16, self.raw_u16_le)
         self._test_write(instance, "write_u32", self.u32, self.raw_u32_le)
@@ -141,6 +148,7 @@ class EndianedIOTestHelper:
 
     def _test_writer_be(self, writer_gen: Callable[[Endianess], EndianedWriterIOBase]):
         instance = writer_gen(">")
+        self._test_write(instance, "write_bool", self.bool, self.raw_bool_be)
         self._test_write(instance, "write_u8", self.u8, self.raw_u8_be)
         self._test_write(instance, "write_u16", self.u16, self.raw_u16_be)
         self._test_write(instance, "write_u32", self.u32, self.raw_u32_be)
@@ -162,22 +170,26 @@ class EndianedIOTestHelper:
         values_raw: bytes,
     ):
         start_pos = reader.tell()
-        read_value_raw = reader.read(len(values_raw))
-        assert read_value_raw == values_raw, (
-            f"Failed to read expected raw bytes: expected {values_raw}, got {read_value_raw}"
-        )
-        reader.seek(start_pos)
-
         call = getattr(reader, call_name)
-        values_read = [call() for _ in range(self.count)]
-        for i, (read_value, expected_value) in enumerate(zip(values_read, values)):
-            assert read_value == expected_value, (
-                f"Failed at index {i}: expected {expected_value}, got {read_value}"
+        call_arr = getattr(reader, f"{call_name}_array")
+
+        def check_read(values_read: list, ins: str):
+            bytes_read = reader.tell() - start_pos
+            assert bytes_read == len(values_raw), (
+                f"Failed to read expected length ({ins}): expected {len(values_raw)}, got {bytes_read}"
             )
-        bytes_read = reader.tell() - start_pos
-        assert bytes_read == len(values_raw), (
-            f"Failed to read expected length: expected {len(values_raw)}, got {bytes_read}"
-        )
+            for i, (expected_value, read_value) in enumerate(zip(values, values_read)):
+                assert read_value == expected_value, (
+                    f"Failed at index {i} in read ({ins}): expected {expected_value}, got {read_value}"
+                )
+
+        reader.seek(start_pos)
+        values_read = [call() for _ in range(self.count)]
+        check_read(values_read, "single")
+
+        reader.seek(start_pos)
+        values_read_arr = call_arr(self.count)
+        check_read(values_read_arr, "array")
 
     def _test_write(
         self,
@@ -189,21 +201,30 @@ class EndianedIOTestHelper:
         writer.flush()
         start_pos = writer.tell()
         call = getattr(writer, call_name)
+        call_arr = getattr(writer, f"{call_name}_array")
+
+        def check_write(ins: str):
+            writer.flush()
+            bytes_written = writer.tell() - start_pos
+            assert bytes_written == len(values_raw), (
+                f"Failed to write expected length ({ins}): expected {len(values_raw)}, got {bytes_written}"
+            )
+            writer.seek(start_pos)
+            read = writer.read(len(values_raw))
+            assert read == values_raw, (
+                f"Failed to read expected raw bytes ({ins}): expected {values_raw}, got {read}"
+            )
+
         for i in range(self.count):
             call(values[i])
-        writer.flush()
+        check_write("single")
 
-        bytes_written = writer.tell() - start_pos
-        assert bytes_written == len(values_raw), (
-            f"Failed to write expected length: expected {len(values_raw)}, got {bytes_written}"
-        )
         writer.seek(start_pos)
-        read = writer.read(len(values_raw))
-        assert read == values_raw, (
-            f"Failed to read expected raw bytes: expected {values_raw}, got {read}"
-        )
+        call_arr(values, False)
+        check_write("array")
 
     def _generate_values(self):
+        self.bool = [bool(v) for v in self._generate_random_ints(0, 1, self.count)]
         self.u8 = self._generate_random_ints(0, 0xFF, self.count)
         self.u16 = self._generate_random_ints(0, 0xFF, self.count)
         self.u32 = self._generate_random_ints(0, 0xFFFFFFFF, self.count)
@@ -223,6 +244,7 @@ class EndianedIOTestHelper:
         )
 
     def _generate_bytes(self):
+        self.raw_bool_le = pack(f"<{self.count}?", *self.bool)
         self.raw_u8_le = pack(f"<{self.count}B", *self.u8)
         self.raw_u16_le = pack(f"<{self.count}H", *self.u16)
         self.raw_u32_le = pack(f"<{self.count}I", *self.u32)
@@ -234,6 +256,7 @@ class EndianedIOTestHelper:
         self.raw_f16_le = pack(f"<{self.count}e", *self.f16)
         self.raw_f32_le = pack(f"<{self.count}f", *self.f32)
         self.raw_f64_le = pack(f"<{self.count}d", *self.f64)
+        self.raw_bool_be = pack(f">{self.count}?", *self.bool)
         self.raw_u8_be = pack(f">{self.count}B", *self.u8)
         self.raw_u16_be = pack(f">{self.count}H", *self.u16)
         self.raw_u32_be = pack(f">{self.count}I", *self.u32)
