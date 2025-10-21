@@ -1,4 +1,5 @@
 import sys
+
 import pytest
 
 if sys.version_info < (3, 12):
@@ -8,12 +9,20 @@ if sys.version_info < (3, 12):
             from bier import serialization  # noqa: F401
 
 else:
+    from dataclasses import dataclass
     from enum import IntEnum, StrEnum
     from typing import Literal
-    from dataclasses import dataclass
 
     from bier.EndianedBinaryIO import EndianedBytesIO
-    from bier.serialization import BinarySerializable, cstr, u8, custom, member_length
+    from bier.serialization import (
+        BinarySerializable,
+        cstr,
+        custom,
+        member_length,
+        prefixed_length,
+        static_length,
+        u8,
+    )
     from bier.serialization.TypeNode import (
         BytesNode,
         ClassNode,
@@ -27,6 +36,7 @@ else:
         I32Node,
         I64Node,
         ListNode,
+        MemberLengthNode,
         PrimitiveNode,
         StaticLengthNode,
         StringNode,
@@ -37,7 +47,6 @@ else:
         U16Node,
         U32Node,
         U64Node,
-        MemberLengthNode
     )
     from tests.EndianedBinaryIO.EndianedIOTestHelper import EndianedIOTestHelper
 
@@ -106,19 +115,18 @@ else:
     class DummyStrEnum(StrEnum):
         X = "x"
 
-
+    @dataclass(slots=True)
     class DummyClass(BinarySerializable):
         u8v: u8
         strv: cstr
 
-        def __init__(self, u8v: u8, strv: str):
-            self.u8v = u8v
-            self.strv = strv
+    @dataclass(slots=True)
+    class DummyClassWithPrefixedLength(BinarySerializable):
+        string_value: custom[str, prefixed_length[u8]]
 
-        def __eq__(self, other):
-            if not isinstance(other, DummyClass):
-                return NotImplemented
-            return self.u8v == other.u8v and self.strv == other.strv
+    @dataclass(slots=True)
+    class DummyClassWithStaticLength(BinarySerializable):
+        string_value: custom[str, static_length[12]]
 
     @dataclass(slots=True)
     class DummyClassWithMemberLength(BinarySerializable):
@@ -237,6 +245,38 @@ else:
                 b"\x00\x00",
                 None,
             ),
+            # StaticLengthNode
+            # ClassNode
+            (
+                ClassNode,
+                (
+                    # nodes
+                    (StringNode(StaticLengthNode(len("cool string!"))),),
+                    # names
+                    ("string_value",),
+                    # call
+                    DummyClassWithStaticLength.from_dict,
+                ),
+                DummyClassWithStaticLength(string_value="cool string!"),
+                b"cool string!",
+                None,
+            ),
+            # PrefixedLengthNode
+            # ClassNode
+            (
+                ClassNode,
+                (
+                    # nodes
+                    (StringNode(U8Node()),),
+                    # names
+                    ("string_value",),
+                    # call
+                    DummyClassWithPrefixedLength.from_dict,
+                ),
+                DummyClassWithPrefixedLength(string_value="cool string!"),
+                b"\x0ccool string!",
+                None,
+            ),
             # MemberLengthNode
             # ClassNode
             (
@@ -249,7 +289,9 @@ else:
                     # call
                     DummyClassWithMemberLength.from_dict,
                 ),
-                DummyClassWithMemberLength(string_length=len("cool string!"), string_value="cool string!"),
+                DummyClassWithMemberLength(
+                    string_length=len("cool string!"), string_value="cool string!"
+                ),
                 b"\x0ccool string!",
                 None,
             ),
