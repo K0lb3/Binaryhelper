@@ -35,7 +35,7 @@ class MemberLengthNode(TypeNode[int]):
     member_name: str
 
     def _get_member_value(self, context) -> int:
-        value = context.get(self.member_name, None)
+        value = context.get(self.member_name, None) if isinstance(context, dict) else getattr(context, self.member_name)
         assert isinstance(value, int), (
             f"Member {self.member_name} was not an int or did not exist"
         )
@@ -47,6 +47,7 @@ class MemberLengthNode(TypeNode[int]):
         return self._get_member_value(context)
 
     def write_to(self, value, writer, context=None):
+        # context here is an instance of the class
         expected_length = self._get_member_value(context)
         assert value == expected_length, (
             f"Expected {expected_length} values, got {value} values"
