@@ -35,7 +35,11 @@ class MemberLengthNode(TypeNode[int]):
     member_name: str
 
     def _get_member_value(self, context) -> int:
-        value = context.get(self.member_name, None) if isinstance(context, dict) else getattr(context, self.member_name)
+        value = (
+            context.get(self.member_name, None)
+            if isinstance(context, dict)
+            else getattr(context, self.member_name)
+        )
         assert isinstance(value, int), (
             f"Member {self.member_name} was not an int or did not exist"
         )
