@@ -9,9 +9,11 @@ if sys.version_info < (3, 12):
 
 else:
     from enum import IntEnum, StrEnum
+    from typing import Literal
+    from dataclasses import dataclass
 
     from bier.EndianedBinaryIO import EndianedBytesIO
-    from bier.serialization import BinarySerializable, cstr, u8
+    from bier.serialization import BinarySerializable, cstr, u8, custom, member_length
     from bier.serialization.TypeNode import (
         BytesNode,
         ClassNode,
@@ -35,6 +37,7 @@ else:
         U16Node,
         U32Node,
         U64Node,
+        MemberLengthNode
     )
     from tests.EndianedBinaryIO.EndianedIOTestHelper import EndianedIOTestHelper
 
@@ -103,6 +106,7 @@ else:
     class DummyStrEnum(StrEnum):
         X = "x"
 
+
     class DummyClass(BinarySerializable):
         u8v: u8
         strv: cstr
@@ -115,6 +119,11 @@ else:
             if not isinstance(other, DummyClass):
                 return NotImplemented
             return self.u8v == other.u8v and self.strv == other.strv
+
+    @dataclass(slots=True)
+    class DummyClassWithMemberLength(BinarySerializable):
+        string_length: u8
+        string_value: custom[str, member_length[Literal["string_length"]]]
 
     @pytest.mark.parametrize(
         "node_cls, instance_args, value, expected_raw, error",
@@ -226,6 +235,22 @@ else:
                 (U16Node(), lambda x: x + 1, lambda x: x - 1),
                 1,
                 b"\x00\x00",
+                None,
+            ),
+            # MemberLengthNode
+            # ClassNode
+            (
+                ClassNode,
+                (
+                    # nodes
+                    (U8Node(), StringNode(MemberLengthNode("string_length"))),
+                    # names
+                    ("string_length", "string_value"),
+                    # call
+                    DummyClassWithMemberLength.from_dict,
+                ),
+                DummyClassWithMemberLength(string_length=len("cool string!"), string_value="cool string!"),
+                b"\x0ccool string!",
                 None,
             ),
         ],
