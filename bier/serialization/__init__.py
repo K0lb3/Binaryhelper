@@ -25,6 +25,7 @@ from .builtins import (
     u16,
     u32,
     u64,
+    varint,
 )
 from .options import (
     convert,
@@ -41,4 +42,7 @@ from .TypeNode import (
     StringNode,
     TupleNode,
     TypeNode,
+)
+from .Serializable import (
+    SerializationContext,
 )
