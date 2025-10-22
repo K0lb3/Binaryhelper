@@ -7,7 +7,7 @@ name = "bier"
 authors = [{ name = "Rudolf Kolbe", email = "rkolbe96@gmail.com" }]
 description = "Endian-aware binary IO streams and annotation driven serialization helpers"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.8"
 classifiers = [
     "Operating System :: OS Independent",
@@ -64,3 +64,4 @@ pythonVersion = "3.12"
 features = [
   "dev",
 ]
+installer = "uv"
