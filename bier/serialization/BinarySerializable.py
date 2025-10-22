@@ -27,7 +27,7 @@ from .builtins import (
     u64,
 )
 from .options import BinarySerializableOptions, convert, custom, member
-from .Serializable import Serializable
+from .Serializable import Serializable, SerializationContext
 from .TypeNode import (
     BytesNode,
     ClassNode,
@@ -66,10 +66,12 @@ class BinarySerializable[*TOptions](Serializable):
 
     @classmethod
     def read_from(cls, reader, context=None):
-        return cls._get_node().read_from(reader, context)
+        return cls._get_node().read_from(reader, context or SerializationContext())
 
     def write_to(self, writer, context=None):
-        return self._get_node().write_to(self, writer, context)
+        return self._get_node().write_to(
+            self, writer, context or SerializationContext()
+        )
 
 
 def get_binary_serializable_spec(cls: type[BinarySerializable]) -> Any:

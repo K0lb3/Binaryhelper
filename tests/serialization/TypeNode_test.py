@@ -55,10 +55,10 @@ else:
 
     def test_primitive_node_singleton():
         class TestPrimitiveNode(PrimitiveNode):
-            def read_from(self, reader, context=None):
+            def read_from(self, reader, context):
                 raise NotImplementedError("This is a test node, not for actual use.")
 
-            def write_to(self, value, writer, context=None):
+            def write_to(self, value, writer, context):
                 raise NotImplementedError("This is a test node, not for actual use.")
 
         node1 = TestPrimitiveNode()
@@ -104,7 +104,9 @@ else:
 
         # Test read
         writer.seek(0)
-        values_read = [node.read_from(writer, SerializationContext()) for _ in range(len(values))]
+        values_read = [
+            node.read_from(writer, SerializationContext()) for _ in range(len(values))
+        ]
         assert values_read == values, f"Expected {values}, got {values_read}"
 
         assert writer.tell() == node.size * len(getattr(HELPER, name))
