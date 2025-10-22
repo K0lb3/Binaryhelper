@@ -1,7 +1,7 @@
 from enum import Enum, IntEnum, IntFlag, StrEnum
 from functools import cache
 from inspect import isclass
-from types import get_original_bases
+from types import get_original_bases, NoneType, UnionType
 from typing import (
     Annotated,
     Any,
@@ -9,6 +9,8 @@ from typing import (
     get_args,
     get_type_hints,
     ClassVar,
+    cast,
+    Union,
 )
 
 from ._typing_helpers import get_origin_type, resolve_genericalias
@@ -154,6 +156,20 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
             elif issubclass(arg, BinarySerializable):
                 return StructNode(clz=arg)
 
+    if origin is Union or origin is UnionType:
+        # todo: do we want to support other constructs other than T | None?
+        # maybe parsing them yes, but not in the default ClassNode parser?
+        # could be useful for custom union parsers
+
+        assert len(args) == 2 and (args[0] is NoneType or args[1] is NoneType), (
+            "only <T> | None union constructs are currently supported"
+        )
+
+        return parse_annotation(
+            args[0] if args[0] is not NoneType else args[1],
+            options,
+        )
+
     if isclass(annotation):
         if issubclass(annotation, Serializable):
             return StructNode(clz=annotation)
@@ -214,7 +230,9 @@ def build_type_node[T: BinarySerializable](cls: type[T]) -> ClassNode[T]:
         for annotation in type_hints.values()
     )
 
-    return ClassNode(
+    class_node_type = cast(type[ClassNode[T]], serialization_options.root_node_type)
+
+    return class_node_type(
         names=names,
         nodes=nodes,
         call=cls.from_dict,
