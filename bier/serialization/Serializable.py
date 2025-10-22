@@ -28,24 +28,31 @@ class Serializable(metaclass=ABCMeta):
     def read_from(
         cls,
         reader: EndianedReaderIOBase,
-        context: SerializationContext = SerializationContext(),
+        context: SerializationContext | None = None,
     ) -> Self: ...
 
     @classmethod
-    def from_bytes(cls, data: bytes, endian: Endianess = "<"):
+    def from_bytes(
+        cls,
+        data: bytes,
+        endian: Endianess = "<",
+        context: SerializationContext | None = None,
+    ):
         with EndianedBytesIO(data, endian) as reader:
-            return cls.read_from(reader)
+            return cls.read_from(reader, context or SerializationContext())
 
     @abstractmethod
     def write_to(
         self,
         writer: EndianedWriterIOBase,
-        context: SerializationContext = SerializationContext(),
+        context: SerializationContext | None = None,
     ) -> int: ...
 
-    def to_bytes(self, endian: Endianess = "<") -> bytes:
+    def to_bytes(
+        self, endian: Endianess = "<", context: SerializationContext | None = None
+    ) -> bytes:
         with EndianedBytesIO(endian=endian) as writer:
-            self.write_to(writer)
+            self.write_to(writer, context or SerializationContext())
             return writer.getvalue()
 
 
@@ -57,9 +64,14 @@ class Serializer[T](metaclass=ABCMeta):
         context: SerializationContext,
     ) -> T: ...
 
-    def from_bytes(self, data: bytes, endian: Endianess = "<"):
+    def from_bytes(
+        self,
+        data: bytes,
+        endian: Endianess = "<",
+        context: SerializationContext | None = None,
+    ):
         with EndianedBytesIO(data, endian) as reader:
-            return self.read_from(reader, SerializationContext())
+            return self.read_from(reader, context or SerializationContext())
 
     @abstractmethod
     def write_to(
@@ -69,7 +81,12 @@ class Serializer[T](metaclass=ABCMeta):
         context: SerializationContext,
     ) -> int: ...
 
-    def to_bytes(self, value: T, endian: Endianess = "<") -> bytes:
+    def to_bytes(
+        self,
+        value: T,
+        endian: Endianess = "<",
+        context: SerializationContext | None = None,
+    ) -> bytes:
         with EndianedBytesIO(endian=endian) as writer:
-            self.write_to(value, writer, SerializationContext())
+            self.write_to(value, writer, context or SerializationContext())
             return writer.getvalue()
