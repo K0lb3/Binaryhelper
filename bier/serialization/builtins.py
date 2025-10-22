@@ -13,6 +13,7 @@ from .TypeNode import (
     U16Node,
     U32Node,
     U64Node,
+    VarIntNode
 )
 
 # primitive types
@@ -33,6 +34,8 @@ f64 = Annotated[float, F64Node]
 
 cstr = Annotated[str, StringNode, None]
 
+varint = Annotated[int, VarIntNode]
+
 __all__ = (
     # primitives
     "u8",
@@ -47,4 +50,5 @@ __all__ = (
     "f32",
     "f64",
     "cstr",
+    "varint"
 )
