@@ -34,6 +34,7 @@ from .options import (
     prefixed_length,
     static_length,
     member_length,
+    custom_root_node,
 )
 from .TypeNode import (
     ClassNode,

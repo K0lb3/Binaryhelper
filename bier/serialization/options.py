@@ -11,12 +11,13 @@ from typing import (
 )
 
 from ._typing_helpers import get_origin_type
-from .TypeNode import StaticLengthNode, MemberLengthNode, TypeNode, U32Node
+from .TypeNode import StaticLengthNode, MemberLengthNode, TypeNode, U32Node, ClassNode
 
 
 @dataclass(frozen=True)
 class BinarySerializableOptions:
     length_type: TypeNode[int] = U32Node()
+    root_node_type: type[ClassNode] = ClassNode
 
     def update_by_type(self, option_type: Any) -> Self:
         arguments = get_args(option_type)
@@ -156,6 +157,24 @@ Used for directly converting a value to/from a different type when serializing a
 """
 # pyright complains about Callable | None, but Union seems to be fine????
 
+
+class custom_root_node[T: ClassNode](BinarySerializableOption):
+    """
+    Used for specifying a custom type node to be used as the root instead of the default ClassNode.
+    Must return an instance of the type it was initialized with.
+    """
+
+    @classmethod
+    def apply_option(cls, options: BinarySerializableOptions, option_type: Any):
+        origin_type = get_origin_type(option_type)
+        assert origin_type is custom_root_node
+
+        args: tuple[type, ...] = get_args(option_type)
+        assert len(args) == 1, "custom_root_node must have exactly one argument"
+
+        return replace(options, root_node_type=args[0])
+
+
 __all__ = (
     "member",
     "convert",
@@ -165,4 +184,6 @@ __all__ = (
     "prefixed_length",
     "static_length",
     "member_length",
+    # custom root node option
+    "custom_root_node",
 )
