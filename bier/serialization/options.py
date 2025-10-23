@@ -26,7 +26,7 @@ class BinarySerializableOptions:
         if origin is Annotated:
             origin = arguments[0]
 
-        assert issubclass(origin, BinarySerializableOption)
+        assert issubclass(origin, BinarySerializableOption), origin
         return origin.apply_option(self, option_type)
 
 
