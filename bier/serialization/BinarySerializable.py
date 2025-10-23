@@ -29,6 +29,7 @@ from .builtins import (
     u64,
 )
 from .options import BinarySerializableOptions, convert, custom, member
+from .metadata import parse_metadata_annotation, is_metadata_annotation
 from .Serializable import Serializable, SerializationContext
 from .TypeNode import (
     BytesNode,
@@ -95,7 +96,10 @@ def parse_enum_base_type(clz: type[Enum]) -> type:
     return bases[0]
 
 
-def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> TypeNode:
+def parse_annotation(
+    annotation: Any,
+    options: BinarySerializableOptions,
+) -> TypeNode:
     if annotation in PRIMITIVES:
         args = get_args(annotation)
         assert len(args) >= 2 and issubclass(args[1], TypeNode), (
@@ -132,10 +136,16 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
         assert len(args) >= 1, "member must have at least one argument"
         member_type = args[0]
         member_options = options
-        for option in args[1:]:
-            member_options = member_options.update_by_type(option)
 
-        return parse_annotation(member_type, member_options)
+        custom_node = parse_annotation(member_type, member_options)
+        for option in args[1:]:
+            if is_metadata_annotation(option):
+                key, value = parse_metadata_annotation(option)
+                custom_node.metadata[key] = value
+            else:
+                member_options = member_options.update_by_type(option)
+
+        return custom_node
 
     if origin is member:
         assert len(args) == 1, "member must have one argument"

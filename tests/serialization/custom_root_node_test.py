@@ -17,6 +17,9 @@ else:
         u32,
         u64,
         ClassNode,
+        SerializationContext,
+        custom,
+        metadata,
     )
     from bier.EndianedBinaryIO import EndianedReaderIOBase, EndianedWriterIOBase
     from dataclasses import dataclass
@@ -47,7 +50,9 @@ else:
 
     @dataclass(frozen=True)
     class CustomOptionalClassNode[T](ClassNode[T]):
-        def read_from(self, reader: EndianedReaderIOBase, context):
+        def read_from(
+            self, reader: EndianedReaderIOBase, context: SerializationContext
+        ):
             read_context = context.fork()
             for name, node in zip(self.names, self.nodes):
                 if not reader.read_bool():
@@ -57,7 +62,9 @@ else:
 
             return self.call(read_context.state)
 
-        def write_to(self, value: T, writer: EndianedWriterIOBase, context):
+        def write_to(
+            self, value: T, writer: EndianedWriterIOBase, context: SerializationContext
+        ):
             write_context = context.fork(value)
             size = 0
             for name, node in zip(self.names, self.nodes):
@@ -83,3 +90,73 @@ else:
 
         bbb = MaybeOptionalClass(None, 135, None)
         assert MaybeOptionalClass.from_bytes(bbb.to_bytes()) == bbb
+
+    @dataclass(frozen=True)
+    class TLVClassNode[T](ClassNode[T]):
+        def read_from(
+            self, reader: EndianedReaderIOBase, context: SerializationContext
+        ):
+            read_context = context.fork()
+
+            fields_by_id = {
+                node.metadata.get("id", 0): (name, node)
+                for name, node in zip(self.names, self.nodes)
+            }
+
+            assert reader.read_u8() == 0x50, "invalid struct start"
+            while True:
+                id = reader.read_u8()
+                if id == 0xFF:
+                    break
+
+                type = reader.read_u8()
+
+                name, node = fields_by_id[id]
+                assert node.metadata.get("type_id", 0) == type, "Invalid type id"
+
+                read_context.state[name] = node.read_from(reader, read_context)
+
+            for name, _ in fields_by_id.values():
+                if name not in read_context.state:
+                    read_context.state[name]
+
+            return self.call(read_context.state)
+
+        def write_to(
+            self, value, writer: EndianedWriterIOBase, context: SerializationContext
+        ):
+            write_context = context.fork(value)
+
+            size = 0
+
+            size += writer.write_u8(0x50)
+
+            for name, node in zip(self.names, self.nodes):
+                member_value = getattr(value, name)
+                if member_value is None:
+                    continue
+
+                assert node.metadata.get("id", 0) != 0xFF, "invalid member id 0xFF"
+
+                size += writer.write_u8(node.metadata.get("id", 0))
+                size += writer.write_u8(node.metadata.get("type_id", 0))
+                size += node.write_to(member_value, writer, write_context)
+
+            size += writer.write_u8(0xFF)
+
+            return size
+
+    @dataclass(slots=True)
+    class TLVTestClass(BinarySerializable[custom_root_node[TLVClassNode]]):
+        field_0: custom[u32 | None, metadata["id", 1], metadata["type_id", 0]]  # noqa: F821
+        field_1: custom[
+            str | None,
+            metadata["id", 2],  # noqa: F821
+            metadata["type_id", 1],  # noqa: F821
+            metadata["is_cool", True],  # noqa: F821
+        ]
+        field_2: custom[str | None, metadata["id", 3], metadata["type_id", 1]]  # noqa: F821
+
+    def test_tlv_classnode():
+        aaa = TLVTestClass(1337, "nyaaaaaa <|:}", ":33333")
+        assert TLVTestClass.from_bytes(aaa.to_bytes()) == aaa

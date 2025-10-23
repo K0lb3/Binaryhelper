@@ -1,12 +1,14 @@
 from abc import ABCMeta
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, ClassVar, Self, Sequence
 
 from .Serializable import Serializable, Serializer
 
 
-class TypeNode[T](Serializer[T], metaclass=ABCMeta): ...
+@dataclass(frozen=True)
+class TypeNode[T](Serializer[T], metaclass=ABCMeta):
+    metadata: dict[str, Any] = field(default_factory=dict, init=False)
 
 
 @dataclass(frozen=True)
