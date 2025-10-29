@@ -142,6 +142,13 @@ def parse_annotation(
             if is_metadata_annotation(option):
                 key, value = parse_metadata_annotation(option)
                 custom_node.metadata[key] = value
+            elif isinstance(option, dict):
+                for option_key, option_value in option.items():
+                    custom_node.metadata[option_key.lstrip(" ")] = (
+                        option_value.lstrip(" ")
+                        if isinstance(option_value, str)
+                        else option_value
+                    )
             else:
                 member_options = member_options.update_by_type(option)
 
