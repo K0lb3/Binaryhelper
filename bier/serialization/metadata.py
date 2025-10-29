@@ -24,10 +24,23 @@ def is_metadata_annotation(annotation) -> bool:
     )
 
 
+# this is done so you can prepend a space to your metadata values
+# to make ruff emit a F722 error, which can be globally suppressed
+# instead of the F841 error which might actually be useful
+def _process_metadata_value(value: Any):
+    if isinstance(value, str):
+        return value.lstrip(" ")
+
+    return value
+
+
 def parse_metadata_annotation(annotation) -> dict[str, Any]:
     # support the simple case - a literal dict
     if isinstance(annotation, dict):
-        return annotation
+        return {
+            _process_metadata_value(x): _process_metadata_value(y)
+            for x, y in annotation.items()
+        }
 
     # node: code below might get removed, the dict is far simpler to use than this
 
@@ -60,7 +73,11 @@ def parse_metadata_annotation(annotation) -> dict[str, Any]:
     else:
         metadata_value_value = metadata_value
 
-    return {metadata_key_value: metadata_value_value}
+    return {
+        _process_metadata_value(metadata_key_value): _process_metadata_value(
+            metadata_value_value
+        )
+    }
 
 
 __all__ = (

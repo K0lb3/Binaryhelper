@@ -173,8 +173,8 @@ else:
         field_0: custom[u32 | None, metadata["id", 1], metadata["type_id", 0]]  # noqa: F821
         field_1: custom[
             str | None,
-            metadata["id", 2],  # noqa: F821
-            metadata["type_id", 1],  # noqa: F821
+            metadata[" id", 2],  # noqa: F722
+            metadata[" type_id", 1],  # noqa: F722
             metadata["is_cool", True],  # noqa: F821
         ]
         field_2: custom[str | None, metadata["id", 3], metadata["type_id", 1]]  # noqa: F821
