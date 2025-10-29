@@ -801,10 +801,10 @@ class EndianedWriterIOBase(IOBase, metaclass=abc.ABCMeta):
         """
         result = 0
         while v > 0x7F:
-            self.write_u8((v & 0x7F) | 0x80)
+            result += self.write_u8((v & 0x7F) | 0x80)
             v >>= 7
-            result += 1
-        return self.write_u8(v)
+
+        return result + self.write_u8(v)
 
     def write_varint_array(self, v: Sequence[int], write_count: bool = True) -> int:
         """Write a variable-length integer array to the stream.
