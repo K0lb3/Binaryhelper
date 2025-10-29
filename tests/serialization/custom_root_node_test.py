@@ -99,8 +99,10 @@ else:
             read_context = context.fork()
 
             fields_by_id = {
-                node.metadata.get("id", 0): (name, node)
-                for name, node in zip(self.names, self.nodes)
+                node_metadata.get("id", 0): (name, node, node_metadata)
+                for name, node, node_metadata in zip(
+                    self.names, self.nodes, self.metadatas
+                )
             }
 
             assert reader.read_u8() == 0x50, "invalid struct start"
@@ -111,12 +113,12 @@ else:
 
                 type = reader.read_u8()
 
-                name, node = fields_by_id[id]
-                assert node.metadata.get("type_id", 0) == type, "Invalid type id"
+                name, node, node_metadata = fields_by_id[id]
+                assert node_metadata.get("type_id", 0) == type, "Invalid type id"
 
                 read_context.state[name] = node.read_from(reader, read_context)
 
-            for name, _ in fields_by_id.values():
+            for name, _, _ in fields_by_id.values():
                 if name not in read_context.state:
                     read_context.state[name]
 
@@ -131,15 +133,17 @@ else:
 
             size += writer.write_u8(0x50)
 
-            for name, node in zip(self.names, self.nodes):
+            for name, node, node_metadata in zip(
+                self.names, self.nodes, self.metadatas
+            ):
                 member_value = getattr(value, name)
                 if member_value is None:
                     continue
 
-                assert node.metadata.get("id", 0) != 0xFF, "invalid member id 0xFF"
+                assert node_metadata.get("id", 0) != 0xFF, "invalid member id 0xFF"
 
-                size += writer.write_u8(node.metadata.get("id", 0))
-                size += writer.write_u8(node.metadata.get("type_id", 0))
+                size += writer.write_u8(node_metadata.get("id", 0))
+                size += writer.write_u8(node_metadata.get("type_id", 0))
                 size += node.write_to(member_value, writer, write_context)
 
             size += writer.write_u8(0xFF)

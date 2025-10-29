@@ -1,5 +1,5 @@
 from abc import ABCMeta
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, ClassVar, Self, Sequence
 
@@ -7,8 +7,7 @@ from .Serializable import Serializable, Serializer
 
 
 @dataclass(frozen=True)
-class TypeNode[T](Serializer[T], metaclass=ABCMeta):
-    metadata: dict[str, Any] = field(default_factory=dict, init=False)
+class TypeNode[T](Serializer[T], metaclass=ABCMeta): ...
 
 
 @dataclass(frozen=True)
@@ -297,6 +296,7 @@ class ClassNode[T](TypeNode[T]):
 
     nodes: tuple[TypeNode, ...]
     names: tuple[str, ...]
+    metadatas: tuple[dict[str, Any], ...]
     call: Callable[[dict[str, Any]], T]
 
     def read_from(self, reader, context):

@@ -136,26 +136,15 @@ def parse_annotation(
         )
 
     if origin is custom:
-        assert len(args) >= 1, "member must have at least one argument"
+        assert len(args) >= 1, "custom must have at least one argument"
         member_type = args[0]
         member_options = options
 
-        custom_node = parse_annotation(member_type, member_options)
         for option in args[1:]:
-            if is_metadata_annotation(option):
-                key, value = parse_metadata_annotation(option)
-                custom_node.metadata[key] = value
-            elif isinstance(option, dict):
-                for option_key, option_value in option.items():
-                    custom_node.metadata[option_key.lstrip(" ")] = (
-                        option_value.lstrip(" ")
-                        if isinstance(option_value, str)
-                        else option_value
-                    )
-            else:
+            if not is_metadata_annotation(option):
                 member_options = member_options.update_by_type(option)
 
-        return custom_node
+        return parse_annotation(member_type, member_options)
 
     if origin is member:
         assert len(args) == 1, "member must have one argument"
@@ -210,6 +199,30 @@ def parse_annotation(
     )
 
 
+def parse_metadata(
+    annotation: Any,
+    options: BinarySerializableOptions,
+) -> dict[str, Any]:
+    origin = get_origin_type(annotation)
+    args = get_args(annotation)
+
+    if origin is custom:
+        metadata = {}
+        for option in args[1:]:
+            if is_metadata_annotation(option):
+                metadata |= parse_metadata_annotation(option)
+
+        return metadata
+
+    if hasattr(annotation, "__value__"):
+        return parse_metadata(
+            resolve_genericalias(origin, args),
+            options=options,
+        )
+
+    return {}
+
+
 def get_serialization_options(
     arguments: tuple[Any, ...], current_options: BinarySerializableOptions
 ) -> BinarySerializableOptions:
@@ -252,12 +265,17 @@ def build_type_node[T: BinarySerializable](cls: type[T]) -> ClassNode[T]:
         parse_annotation(annotation, serialization_options)
         for annotation in type_hints.values()
     )
+    metadatas = tuple(
+        parse_metadata(annotation, serialization_options)
+        for annotation in type_hints.values()
+    )
 
     class_node_type = cast(type[ClassNode[T]], serialization_options.root_node_type)
 
     return class_node_type(
         names=names,
         nodes=nodes,
+        metadatas=metadatas,
         call=cls.from_dict,
     )
 

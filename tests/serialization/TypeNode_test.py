@@ -210,6 +210,8 @@ else:
                     (U8Node(), StringNode()),
                     # names
                     ("u8v", "strv"),
+                    # metadatas
+                    ({}, {}),
                     # call
                     DummyClass.from_dict,
                 ),
@@ -257,6 +259,8 @@ else:
                     (StringNode(StaticLengthNode(len("cool string!"))),),
                     # names
                     ("string_value",),
+                    # metadatas
+                    ({},),
                     # call
                     DummyClassWithStaticLength.from_dict,
                 ),
@@ -273,6 +277,8 @@ else:
                     (StringNode(U8Node()),),
                     # names
                     ("string_value",),
+                    # metadatas
+                    ({},),
                     # call
                     DummyClassWithPrefixedLength.from_dict,
                 ),
@@ -289,6 +295,8 @@ else:
                     (U8Node(), StringNode(MemberLengthNode("string_length"))),
                     # names
                     ("string_length", "string_value"),
+                    # metadatas
+                    ({}, {}),
                     # call
                     DummyClassWithMemberLength.from_dict,
                 ),
