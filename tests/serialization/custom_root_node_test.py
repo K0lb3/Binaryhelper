@@ -159,4 +159,24 @@ else:
 
     def test_tlv_classnode():
         aaa = TLVTestClass(1337, "nyaaaaaa <|:}", ":33333")
-        assert TLVTestClass.from_bytes(aaa.to_bytes()) == aaa
+        assert TLVTestClass.from_bytes(aaa.to_bytes()) == aaa  # pyright: ignore[reportInvalidTypeForm, reportGeneralTypeIssues]
+
+    class SubclassedSerializable(BinarySerializable[custom_root_node[TLVClassNode]]):
+        pass
+
+    @dataclass(slots=True)
+    class TLVTestClass2(SubclassedSerializable):
+        field_0: custom[u32 | None, metadata["id", 1], metadata["type_id", 0]]  # noqa: F821
+        field_1: custom[
+            str | None,
+            metadata["id", 2],  # noqa: F821
+            metadata["type_id", 1],  # noqa: F821
+            metadata["is_cool", True],  # noqa: F821
+        ]
+        field_2: custom[str | None, metadata["id", 3], metadata["type_id", 1]]  # noqa: F821
+
+    def test_subclassed_serializable():
+        aaa = TLVTestClass2(1337, "nyaaaaaa <|:}", ":33333")
+        assert TLVTestClass.from_bytes(aaa.to_bytes()) == TLVTestClass(
+            1337, "nyaaaaaa <|:}", ":33333"
+        )

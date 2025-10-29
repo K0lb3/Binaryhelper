@@ -78,11 +78,14 @@ class BinarySerializable[*TOptions](Serializable):
 
 
 def get_binary_serializable_spec(cls: type[BinarySerializable]) -> Any:
-    for base in get_original_bases(cls):
-        if get_origin_type(base) is BinarySerializable:
-            return base
+    if get_origin_type(cls) is BinarySerializable:
+        return cls
 
-    raise ValueError(f"Type {cls} does not inherit from BinarySerializable")
+    for base in get_original_bases(cls):
+        if (spec := get_binary_serializable_spec(base)) is not None:
+            return spec
+
+    return None
 
 
 def parse_enum_base_type(clz: type[Enum]) -> type:
@@ -222,6 +225,9 @@ def get_serialization_options(
 
 def get_type_serialization_options(cls: type[BinarySerializable]):
     spec = get_binary_serializable_spec(cls)
+    if spec is None:
+        raise ValueError(f"Type {cls} does not inherit from BinarySerializable")
+
     arguments = get_args(spec)
     return get_serialization_options(arguments, BinarySerializableOptions())
 
