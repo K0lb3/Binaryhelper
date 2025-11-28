@@ -1,4 +1,4 @@
-from enum import Enum, IntEnum, IntFlag, StrEnum
+from enum import Enum, Flag, IntEnum, IntFlag, StrEnum
 from functools import cache
 from inspect import isclass
 from types import get_original_bases, NoneType, UnionType
@@ -94,8 +94,10 @@ def parse_enum_base_type(clz: type[Enum]) -> type:
             return value_type
 
     bases = get_original_bases(clz)
-    assert len(bases) == 2, "enum member must have two arguments"
-    assert bases[1] is Enum, "enum second base type must be Enum"
+    assert len(bases) == 2, "enum/flag member must have two arguments"
+    assert bases[1] is Enum or bases[1] is Flag, (
+        "enum/flag second base type must be Enum or Flag"
+    )
     return bases[0]
 
 
