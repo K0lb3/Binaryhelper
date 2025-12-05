@@ -36,7 +36,6 @@ from .options import (
     member_length,
     custom_root_node,
 )
-from .metadata import metadata
 from .TypeNode import (
     ClassNode,
     ListNode,
