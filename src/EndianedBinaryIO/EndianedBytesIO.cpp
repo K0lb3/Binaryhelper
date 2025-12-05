@@ -154,7 +154,7 @@ static PyObject *EndianedBytesIO_read_t(EndianedBytesIO *self, PyObject *unused)
 {
     CHECK_CLOSED
     T value{};
-    if (self->pos + sizeof(T) > self->view.len)
+    if (self->pos + (Py_ssize_t)sizeof(T) > self->view.len)
     {
         PyErr_SetString(PyExc_ValueError, "Read exceeds buffer length.");
         return nullptr;
@@ -223,7 +223,7 @@ static PyObject *EndianedBytesIO_read_array_t(EndianedBytesIO *self, PyObject *a
         return nullptr;
     }
 
-    if (size * sizeof(T) > self->view.len - self->pos)
+    if (size * (Py_ssize_t)sizeof(T) > self->view.len - self->pos)
     {
         PyErr_SetString(PyExc_ValueError, "Read exceeds buffer length.");
         return nullptr;

@@ -527,7 +527,9 @@ std::optional<Py_ssize_t> EndianedStreamIO_read_varint_internal(EndianedStreamIO
             PyErr_SetString(PyExc_OverflowError, "Varint too large.");
             return std::nullopt;
         }
-    }   
+    }
+
+    return value;
 }
 
 static PyObject *EndianedStreamIO_read_varint(EndianedStreamIO *self, PyObject *args)
