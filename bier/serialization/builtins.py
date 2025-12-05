@@ -13,7 +13,7 @@ from .TypeNode import (
     U16Node,
     U32Node,
     U64Node,
-    VarIntNode
+    VarIntNode,
 )
 
 # primitive types
@@ -50,5 +50,5 @@ __all__ = (
     "f32",
     "f64",
     "cstr",
-    "varint"
+    "varint",
 )
