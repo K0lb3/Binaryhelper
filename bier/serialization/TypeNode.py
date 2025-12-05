@@ -369,6 +369,14 @@ class VarIntNode(TypeNode[int]):
         return writer.write_varint(value)
 
 
+class SVarIntNode(TypeNode[int]):
+    def read_from(self, reader, context):
+        return reader.read_signed_varint()
+
+    def write_to(self, value, writer, context):
+        return writer.write_signed_varint(value)
+
+
 __all__ = (
     "TypeNode",
     "PrimitiveNode",
@@ -394,4 +402,5 @@ __all__ = (
     "StaticLengthNode",
     "MemberLengthNode",
     "VarIntNode",
+    "SVarIntNode",
 )
