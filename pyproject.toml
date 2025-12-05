@@ -10,21 +10,21 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"
 classifiers = [
-    "Operating System :: OS Independent",
-    "Intended Audience :: Developers",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
-    "Topic :: Software Development :: Libraries :: Python Modules",
+  "Operating System :: OS Independent",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "typing-extensions>=4.6; python_version >= '3.8' and python_version < '3.12'",
+  "typing-extensions>=4.6; python_version >= '3.8' and python_version < '3.12'",
 ]
 dynamic = ["version"]
 
@@ -61,7 +61,9 @@ archs = ["AMD64", "ARM64"]
 pythonVersion = "3.12"
 
 [tool.hatch.envs.default]
-features = [
-  "dev",
-]
+features = ["dev"]
 installer = "uv"
+python = "3.14"
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.14"]
