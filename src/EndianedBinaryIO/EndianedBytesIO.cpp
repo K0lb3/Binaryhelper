@@ -1,6 +1,7 @@
 #include <concepts>
 #include <cstdint>
 #include <bit>
+#include <optional>
 #include <type_traits>
 
 #include "Python.h"
@@ -507,7 +508,8 @@ static PyObject *EndianedBytesIO_write_bytes(EndianedBytesIO *self, PyObject *ar
     return PyLong_FromSsize_t(self->pos - start_pos);
 }
 
-static PyObject *EndianedBytesIO_write_varint(EndianedBytesIO *self, PyObject *arg)
+template<bool IsSigned>
+static PyObject *EndianedBytesIO_write_varint_internal(EndianedBytesIO *self, PyObject *arg)
 {
     CHECK_CLOSED
     if (self->view.readonly)
@@ -521,12 +523,27 @@ static PyObject *EndianedBytesIO_write_varint(EndianedBytesIO *self, PyObject *a
     {
         return nullptr;
     }
-    if (value < 0)
+    
+    if constexpr (IsSigned)
     {
-        PyErr_SetString(PyExc_ValueError, "Varint must be non-negative.");
-        return nullptr;
+        if (value < 0)
+        {
+            value = ((-value - 1) << 1) | 1;
+        }
+        else
+        {
+            value = (value << 1) | 0;
+        }
     }
-
+    else
+    {
+        if (value < 0)
+        {
+            PyErr_SetString(PyExc_ValueError, "Varint must be non-negative.");
+            return nullptr;
+        }
+    }
+    
     // Calculate the number of bytes needed for the varint
     Py_ssize_t write_size = 0;
     uint64_t temp = value;
@@ -551,7 +568,8 @@ static PyObject *EndianedBytesIO_write_varint(EndianedBytesIO *self, PyObject *a
     return PyLong_FromSsize_t(write_size);
 }
 
-static PyObject *EndianedBytesIO_write_varint_array(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
+template<bool IsSigned>
+static PyObject *EndianedBytesIO_write_varint_array_internal(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
 {
     CHECK_CLOSED
     if (self->view.readonly)
@@ -588,7 +606,8 @@ static PyObject *EndianedBytesIO_write_varint_array(EndianedBytesIO *self, PyObj
     PyObject *item = PyIter_Next(iter);
     while (item)
     {
-        EndianedBytesIO_write_varint(self, item);
+        EndianedBytesIO_write_varint_internal<IsSigned>(self, item);
+
         if (PyErr_Occurred())
         {
             self->pos = start_pos;
@@ -598,6 +617,26 @@ static PyObject *EndianedBytesIO_write_varint_array(EndianedBytesIO *self, PyObj
     }
     Py_DecRef(iter);
     return PyLong_FromSsize_t(self->pos - start_pos);
+}
+
+static PyObject *EndianedBytesIO_write_varint(EndianedBytesIO *self, PyObject *arg)
+{
+    return EndianedBytesIO_write_varint_internal<false>(self, arg);
+}
+
+static PyObject *EndianedBytesIO_write_varint_array(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
+{
+    return EndianedBytesIO_write_varint_array_internal<false>(self, args, kwds);
+}
+
+static PyObject *EndianedBytesIO_write_signed_varint(EndianedBytesIO *self, PyObject *arg)
+{
+    return EndianedBytesIO_write_varint_internal<true>(self, arg);
+}
+
+static PyObject *EndianedBytesIO_write_signed_varint_array(EndianedBytesIO *self, PyObject *args, PyObject *kwds)
+{
+    return EndianedBytesIO_write_varint_array_internal<true>(self, args, kwds);
 }
 
 static PyObject *EndianedBytesIO_seek(EndianedBytesIO *self, PyObject *args)
@@ -934,9 +973,8 @@ static PyObject *EndianedBytesIO_readlines(EndianedBytesIO *self, PyObject *size
     return result;
 }
 
-static PyObject *EndianedBytesIO_read_varint(EndianedBytesIO *self, PyObject *args)
+static std::optional<Py_ssize_t> EndianedBytesIO_read_varint_internal(EndianedBytesIO* self) 
 {
-    CHECK_CLOSED
     Py_ssize_t value = 0;
     uint32_t shift = 0;
 
@@ -945,7 +983,7 @@ static PyObject *EndianedBytesIO_read_varint(EndianedBytesIO *self, PyObject *ar
         if (self->pos >= self->view.len)
         {
             PyErr_SetString(PyExc_ValueError, "Read exceeds buffer length.");
-            return nullptr;
+            return std::nullopt;
         }
         unsigned char byte = static_cast<unsigned char *>(self->view.buf)[self->pos++];
         value |= (static_cast<Py_ssize_t>(byte & 0x7F) << shift);
@@ -957,10 +995,24 @@ static PyObject *EndianedBytesIO_read_varint(EndianedBytesIO *self, PyObject *ar
         if (shift >= sizeof(Py_ssize_t) * 8)
         {
             PyErr_SetString(PyExc_OverflowError, "Varint too large.");
-            return nullptr;
+            return std::nullopt;
         }
     }
-    return PyLong_FromSsize_t(value);
+
+    return value;
+}
+
+static PyObject *EndianedBytesIO_read_varint(EndianedBytesIO *self, PyObject *args)
+{
+    CHECK_CLOSED
+    
+    const auto value = EndianedBytesIO_read_varint_internal(self);
+    if (!value) 
+    {
+        return nullptr;
+    }
+
+    return PyLong_FromSsize_t(value.value());
 }
 
 static PyObject *EndianedBytesIO_read_varint_array(EndianedBytesIO *self, PyObject *args)
@@ -984,6 +1036,56 @@ static PyObject *EndianedBytesIO_read_varint_array(EndianedBytesIO *self, PyObje
     for (Py_ssize_t i = 0; i < size; ++i)
     {
         PyObject *item = EndianedBytesIO_read_varint(self, nullptr);
+        if (item == nullptr)
+        {
+            Py_DecRef(ret);
+            return nullptr;
+        }
+        PyTuple_SetItem(ret, i, item); // Steal reference, no need to DECREF
+    }
+    return ret;
+}
+
+static PyObject *EndianedBytesIO_read_signed_varint(EndianedBytesIO *self, PyObject *args)
+{
+    CHECK_CLOSED
+    
+    const auto value = EndianedBytesIO_read_varint_internal(self);
+    if (!value) 
+    {
+        return nullptr;
+    }
+
+    Py_ssize_t varint_value = value.value() >> 1;
+    if (value.value() & 1)
+    {
+        varint_value = -(varint_value + 1);
+    }
+
+    return PyLong_FromSsize_t(varint_value);
+}
+
+static PyObject *EndianedBytesIO_read_signed_varint_array(EndianedBytesIO *self, PyObject *args)
+{
+    CHECK_CLOSED
+    Py_ssize_t size = 0;
+
+    if (!_read_count(self, args, size))
+    {
+        return nullptr;
+    }
+
+    if (size > self->view.len - self->pos)
+    {
+        PyErr_SetString(PyExc_ValueError, "Read exceeds buffer length.");
+        return nullptr;
+    }
+
+    PyObject *ret = PyTuple_New(size);
+
+    for (Py_ssize_t i = 0; i < size; ++i)
+    {
+        PyObject *item = EndianedBytesIO_read_signed_varint(self, nullptr);
         if (item == nullptr)
         {
             Py_DecRef(ret);

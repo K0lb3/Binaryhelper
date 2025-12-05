@@ -43,27 +43,29 @@
         {"read_" #T "_le_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<T, '<'>), METH_O, "Read a " #T " array."}, \
         {"read_" #T "_be_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<T, '>'>), METH_O, "Read a " #T " array."}
 
-#define GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS(EndianedIOClass)                                                                                         \
-    {"read_bool", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_t<bool, '|'>), METH_NOARGS, "Read a bool value."},                               \
-        {"read_bool_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<bool, '|'>), METH_O, "Read a bool array."},                    \
-        {"read_u8", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_t<u8, '|'>), METH_NOARGS, "Read a u8 value."},                                 \
-        {"read_u8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<u8, '|'>), METH_O, "Read a u8 array."},                          \
-        {"read_i8", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_t<i8, '|'>), METH_NOARGS, "Read an i8 value."},                                \
-        {"read_i8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<i8, '|'>), METH_O, "Read a i8 array."},                          \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, u16),                                                                             \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, u32),                                                                             \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, u64),                                                                             \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, i16),                                                                             \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, i32),                                                                             \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, i64),                                                                             \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, f16),                                                                             \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, f32),                                                                             \
-        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, f64),                                                                             \
-        {"read_cstring", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_cstring), METH_VARARGS | METH_KEYWORDS, "Read until a null terminator."}, \
-        {"read_string", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_string), METH_VARARGS | METH_KEYWORDS, "Read a string."},                  \
-        {"read_bytes", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_bytes), METH_O, "Read a byte array."},                                      \
-        {"read_varint", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_varint), METH_NOARGS, "Read a variable-length integer."},                  \
-        {"read_varint_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_varint_array), METH_O, "Read a variable-length integer array."}
+#define GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS(EndianedIOClass)                                                                                             \
+    {"read_bool", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_t<bool, '|'>), METH_NOARGS, "Read a bool value."},                                   \
+        {"read_bool_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<bool, '|'>), METH_O, "Read a bool array."},                        \
+        {"read_u8", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_t<u8, '|'>), METH_NOARGS, "Read a u8 value."},                                     \
+        {"read_u8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<u8, '|'>), METH_O, "Read a u8 array."},                              \
+        {"read_i8", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_t<i8, '|'>), METH_NOARGS, "Read an i8 value."},                                    \
+        {"read_i8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_array_t<i8, '|'>), METH_O, "Read a i8 array."},                              \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, u16),                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, u32),                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, u64),                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, i16),                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, i32),                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, i64),                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, f16),                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, f32),                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_READ_FUNCTIONS_TYPE(EndianedIOClass, f64),                                                                                 \
+        {"read_cstring", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_cstring), METH_VARARGS | METH_KEYWORDS, "Read until a null terminator."},     \
+        {"read_string", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_string), METH_VARARGS | METH_KEYWORDS, "Read a string."},                      \
+        {"read_bytes", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_bytes), METH_O, "Read a byte array."},                                          \
+        {"read_varint", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_varint), METH_NOARGS, "Read a variable-length integer."},                      \
+        {"read_varint_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_varint_array), METH_O, "Read a variable-length integer array."},         \
+        {"read_signed_varint", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_signed_varint), METH_NOARGS, "Read a signed variable-length integer."}, \
+        {"read_signed_varint_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_signed_varint_array), METH_O, "Read a signed variable-length integer array."}
 
 #define GENERATE_ENDIANEDIOBASE_BASE_FUNCTIONS(EndianedIOClass)                                                                          \
     {"read", reinterpret_cast<PyCFunction>(EndianedIOClass##_read), METH_O, "Read bytes from the buffer."},                              \
@@ -91,27 +93,29 @@
         {"write_" #T "_le_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_array_t<T, '<'>), METH_VARARGS | METH_KEYWORDS, "Write a " #T " array."}, \
         {"write_" #T "_be_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_array_t<T, '>'>), METH_VARARGS | METH_KEYWORDS, "Write a " #T " array."}
 
-#define GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS(EndianedIOClass)                                                                                              \
-    {"write_bool", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<bool, '|'>), METH_O, "Write a bool value."},                                       \
-        {"write_bool_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_array_t<bool, '|'>), METH_VARARGS | METH_KEYWORDS, "Write a bool array."}, \
-        {"write_u8", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<u8, '|'>), METH_O, "Write a u8 value."},                                         \
-        {"write_u8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_array_t<u8, '|'>), METH_VARARGS | METH_KEYWORDS, "Write a u8 array."},       \
-        {"write_i8", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<i8, '|'>), METH_O, "Write an i8 value."},                                        \
-        {"write_i8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_array_t<i8, '|'>), METH_VARARGS | METH_KEYWORDS, "Write a i8 array."},       \
-        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, u16),                                                                                  \
-        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, u32),                                                                                  \
-        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, u64),                                                                                  \
-        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, i16),                                                                                  \
-        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, i32),                                                                                  \
-        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, i64),                                                                                  \
-        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, f16),                                                                                  \
-        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, f32),                                                                                  \
-        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, f64),                                                                                  \
-        {"write_cstring", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_cstring), METH_VARARGS | METH_KEYWORDS, "Write a C-style string."},           \
-        {"write_string", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_string), METH_VARARGS | METH_KEYWORDS, "Write a string."},                     \
-        {"write_bytes", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_bytes), METH_O, "Write a byte array."},                                         \
-        {"write_varint", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_varint), METH_O, "Write a variable-length integer."},                          \
-        {"write_varint_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_varint_array), METH_VARARGS | METH_KEYWORDS, "Write a variable-length integer array."}
+#define GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS(EndianedIOClass)                                                                                                             \
+    {"write_bool", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<bool, '|'>), METH_O, "Write a bool value."},                                                      \
+        {"write_bool_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_array_t<bool, '|'>), METH_VARARGS | METH_KEYWORDS, "Write a bool array."},                \
+        {"write_u8", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<u8, '|'>), METH_O, "Write a u8 value."},                                                        \
+        {"write_u8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_array_t<u8, '|'>), METH_VARARGS | METH_KEYWORDS, "Write a u8 array."},                      \
+        {"write_i8", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<i8, '|'>), METH_O, "Write an i8 value."},                                                       \
+        {"write_i8_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_array_t<i8, '|'>), METH_VARARGS | METH_KEYWORDS, "Write a i8 array."},                      \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, u16),                                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, u32),                                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, u64),                                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, i16),                                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, i32),                                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, i64),                                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, f16),                                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, f32),                                                                                                 \
+        _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, f64),                                                                                                 \
+        {"write_cstring", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_cstring), METH_VARARGS | METH_KEYWORDS, "Write a C-style string."},                          \
+        {"write_string", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_string), METH_VARARGS | METH_KEYWORDS, "Write a string."},                                    \
+        {"write_bytes", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_bytes), METH_O, "Write a byte array."},                                                        \
+        {"write_varint", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_varint), METH_O, "Write a variable-length integer."},                                         \
+        {"write_varint_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_varint_array), METH_VARARGS | METH_KEYWORDS, "Write a variable-length integer array."}, \
+        {"write_signed_varint", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_signed_varint), METH_O, "Write a variable-length integer."},                           \
+        {"write_signed_varint_array", reinterpret_cast<PyCFunction>(EndianedIOClass##_write_signed_varint_array), METH_VARARGS | METH_KEYWORDS, "Write a variable-length integer array."}
 
 template <typename T>
 concept EndianedIOConfig = requires {

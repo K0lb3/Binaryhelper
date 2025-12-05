@@ -851,7 +851,13 @@ class EndianedWriterIOBase(IOBase, metaclass=abc.ABCMeta):
         Args:
             v (int): The signed variable-length integer to write.
         """
-        return self.write_varint((v << 1) | (1 if v > 0 else 0))
+
+        if v < 0:
+            v = ((-v - 1) << 1) | 1
+        else:
+            v = (v << 1) | 0
+
+        return self.write_varint(v)
 
     def write_signed_varint_array(
         self, v: Sequence[int], write_count: bool = True
