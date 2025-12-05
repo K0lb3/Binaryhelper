@@ -19,10 +19,15 @@ else:
         ClassNode,
         SerializationContext,
         custom,
-        metadata,
     )
     from bier.EndianedBinaryIO import EndianedReaderIOBase, EndianedWriterIOBase
     from dataclasses import dataclass
+    from typing import TYPE_CHECKING, TypedDict, NotRequired
+
+    # this is used to silence warnings for custom usage
+    # include this in your own code if you want!
+    if TYPE_CHECKING:
+        from typing import Annotated as custom
 
     @dataclass(frozen=True)
     class CustomClassNode[T](ClassNode[T]):
@@ -152,14 +157,9 @@ else:
 
     @dataclass(slots=True)
     class TLVTestClass(BinarySerializable[custom_root_node[TLVClassNode]]):
-        field_0: custom[u32 | None, metadata["id", 1], metadata["type_id", 0]]  # noqa: F821
-        field_1: custom[
-            str | None,
-            metadata["id", 2],  # noqa: F821
-            metadata["type_id", 1],  # noqa: F821
-            metadata["is_cool", True],  # noqa: F821
-        ]
-        field_2: custom[str | None, metadata["id", 3], metadata["type_id", 1]]  # noqa: F821
+        field_0: custom[u32 | None, {"id": 1, "type_id": 0}]  # noqa: F821
+        field_1: custom[str | None, {"id": 2, "type_id": 1, "is_cool": True}]
+        field_2: custom[str | None, {"id": 3, "type_id": 1}]  # noqa: F821
 
     def test_tlv_classnode():
         aaa = TLVTestClass(1337, "nyaaaaaa <|:}", ":33333")
@@ -170,17 +170,29 @@ else:
 
     @dataclass(slots=True)
     class TLVTestClass2(SubclassedSerializable):
-        field_0: custom[u32 | None, metadata["id", 1], metadata["type_id", 0]]  # noqa: F821
-        field_1: custom[
-            str | None,
-            metadata[" id", 2],  # noqa: F722
-            metadata[" type_id", 1],  # noqa: F722
-            metadata["is_cool", True],  # noqa: F821
-        ]
-        field_2: custom[str | None, metadata["id", 3], metadata["type_id", 1]]  # noqa: F821
+        field_0: custom[u32 | None, {"id": 1, "type_id": 0}]  # noqa: F821
+        field_1: custom[str | None, {" id": 2, " type_id": 1, "is_cool": True}]
+        field_2: custom[str | None, {"id": 3, "type_id": 1}]  # noqa: F821
 
     def test_subclassed_serializable():
         aaa = TLVTestClass2(1337, "nyaaaaaa <|:}", ":33333")
         assert TLVTestClass.from_bytes(aaa.to_bytes()) == TLVTestClass(
+            1337, "nyaaaaaa <|:}", ":33333"
+        )
+
+    class TLVInfo(TypedDict):
+        id: int
+        type_id: int
+        is_cool: NotRequired[bool]
+
+    @dataclass(slots=True)
+    class TLVTestClass3(SubclassedSerializable):
+        field_0: custom[u32 | None, TLVInfo(id=1, type_id=0)]
+        field_1: custom[str | None, TLVInfo(id=2, type_id=1, is_cool=True)]
+        field_2: custom[str | None, TLVInfo(id=3, type_id=1)]
+
+    def test_subclassed_serializable_typeddict():
+        aaa = TLVTestClass3(1337, "nyaaaaaa <|:}", ":33333")
+        assert TLVTestClass3.from_bytes(aaa.to_bytes()) == TLVTestClass3(
             1337, "nyaaaaaa <|:}", ":33333"
         )
