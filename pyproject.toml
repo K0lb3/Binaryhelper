@@ -32,6 +32,7 @@ dynamic = ["version"]
 # optional dependencies must be lowercase/normalized
 tests = ["pytest"]
 dev = ["ruff", "pre-commit", "bier[tests]"]
+dev_uv = ["ruff", "pre-commit-uv", "bier[tests]"]
 
 [project.urls]
 "Homepage" = "https://github.com/K0lb3/Binaryhelper"
@@ -61,7 +62,7 @@ archs = ["AMD64", "ARM64"]
 pythonVersion = "3.12"
 
 [tool.hatch.envs.default]
-features = ["dev"]
+features = ["dev_uv"]
 installer = "uv"
 python = "3.14"
 
