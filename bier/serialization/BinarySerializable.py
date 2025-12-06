@@ -41,6 +41,7 @@ from .TypeNode import (
     StructNode,
     TupleNode,
     TypeNode,
+    ClassNodeMember,
 )
 
 PRIMITIVES = (
@@ -262,22 +263,16 @@ def build_type_node[T: BinarySerializable](cls: type[T]) -> ClassNode[T]:
         if get_origin_type(value) is not ClassVar
     }
 
-    names = tuple(type_hints.keys())
-    nodes = tuple(
-        parse_annotation(annotation, serialization_options)
-        for annotation in type_hints.values()
-    )
-    metadatas = tuple(
-        parse_metadata(annotation, serialization_options)
-        for annotation in type_hints.values()
-    )
+    members = []
+    for name, annotation in type_hints.items():
+        node = parse_annotation(annotation, serialization_options)
+        metadata = parse_metadata(annotation, serialization_options)
+        members.append(ClassNodeMember(name, node, metadata))
 
     class_node_type = cast(type[ClassNode[T]], serialization_options.root_node_type)
 
     return class_node_type(
-        names=names,
-        nodes=nodes,
-        metadatas=metadatas,
+        members=tuple(members),
         call=cls.from_dict,
     )
 

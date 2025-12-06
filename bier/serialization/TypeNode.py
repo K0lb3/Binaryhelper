@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, ClassVar, Self, Sequence
 
-from .Serializable import Serializable, Serializer
+from .Serializable import Serializable, Serializer, SerializationContext
+from ..EndianedBinaryIO import EndianedReaderIOBase, EndianedWriterIOBase
 
 
 @dataclass(frozen=True)
@@ -291,26 +292,56 @@ class TupleNode[T](TypeNode[tuple[T, ...]]):
 
 
 @dataclass(frozen=True)
+class ClassNodeMember:
+    """Represents information about a member of a given ClassNode."""
+
+    name: str
+    node: TypeNode
+    metadata: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class ClassNode[T](TypeNode[T]):
     """ClassNode relates to a class of parsable nodes of different types."""
 
-    nodes: tuple[TypeNode, ...]
-    names: tuple[str, ...]
-    metadatas: tuple[dict[str, Any], ...]
+    members: tuple[ClassNodeMember, ...]
     call: Callable[[dict[str, Any]], T]
 
+    def _read_member(
+        self,
+        member: ClassNodeMember,
+        reader: EndianedReaderIOBase,
+        context: SerializationContext,
+    ) -> Any:
+        member_read_context = context.fork(metadata=member.metadata)
+        return member.node.read_from(reader, member_read_context)
+
+    def _write_member(
+        self,
+        value: T,
+        member: ClassNodeMember,
+        writer: EndianedWriterIOBase,
+        context: SerializationContext,
+    ) -> int:
+        member_write_context = context.fork(metadata=member.metadata)
+        return member.node.write_to(
+            getattr(value, member.name), writer, member_write_context
+        )
+
     def read_from(self, reader, context):
-        read_context = context.fork()
-        for name, node in zip(self.names, self.nodes):
-            read_context.state[name] = node.read_from(reader, read_context)
+        read_context = context.fork(state={})
+        for member in self.members:
+            read_context.state[member.name] = self._read_member(
+                member, reader, read_context
+            )
 
         return self.call(read_context.state)
 
     def write_to(self, value: T, writer, context):
-        write_context = context.fork(value)
+        write_context = context.fork(state=value)
         return sum(
-            node.write_to(getattr(value, name), writer, write_context)
-            for name, node in zip(self.names, self.nodes)
+            self._write_member(value, member, writer, write_context)
+            for member in self.members
         )
 
 
@@ -403,4 +434,5 @@ __all__ = (
     "MemberLengthNode",
     "VarIntNode",
     "SVarIntNode",
+    "ClassNodeMember",
 )

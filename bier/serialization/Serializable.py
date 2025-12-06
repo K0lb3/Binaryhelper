@@ -17,9 +17,21 @@ class SerializationContext:
     state: dict[str, Any] | Any = dataclasses.field(
         default_factory=dict
     )  # note: ideally this is either generic or BinarySerializable
+    metadata: dict[str, Any] = dataclasses.field(default_factory=dict)
 
-    def fork(self, state: dict[str, Any] | Any | None = None) -> "SerializationContext":
-        return SerializationContext(self.settings, state if state is not None else {})
+    def fork(
+        self,
+        state: dict[str, Any] | Any | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> "SerializationContext":
+        state = state if state is not None else self.state
+        metadata = (self.metadata | metadata) if metadata is not None else self.metadata
+
+        return SerializationContext(
+            self.settings,
+            state,
+            metadata,
+        )
 
 
 class Serializable(metaclass=ABCMeta):

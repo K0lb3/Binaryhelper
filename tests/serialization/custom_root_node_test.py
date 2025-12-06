@@ -55,29 +55,21 @@ else:
 
     @dataclass(frozen=True)
     class CustomOptionalClassNode[T](ClassNode[T]):
-        def read_from(
-            self, reader: EndianedReaderIOBase, context: SerializationContext
-        ):
-            read_context = context.fork()
-            for name, node in zip(self.names, self.nodes):
-                if not reader.read_bool():
-                    read_context.state[name] = None
-                else:
-                    read_context.state[name] = node.read_from(reader, read_context)
+        def _read_member(self, member, reader, context):
+            if not reader.read_bool():
+                return None
 
-            return self.call(read_context.state)
+            return super()._read_member(member, reader, context)
 
-        def write_to(
-            self, value: T, writer: EndianedWriterIOBase, context: SerializationContext
-        ):
-            write_context = context.fork(value)
+        def _write_member(self, value, member, writer, context):
             size = 0
-            for name, node in zip(self.names, self.nodes):
-                member_value = getattr(value, name)
-                is_not_none = member_value is not None
-                size += writer.write_bool(is_not_none)
-                if is_not_none:
-                    size += node.write_to(member_value, writer, write_context)
+
+            member_value = getattr(value, member.name)
+            is_not_none = member_value is not None
+
+            size += writer.write_bool(is_not_none)
+            if is_not_none:
+                size += super()._write_member(value, member, writer, context)
 
             return size
 
@@ -96,18 +88,17 @@ else:
         bbb = MaybeOptionalClass(None, 135, None)
         assert MaybeOptionalClass.from_bytes(bbb.to_bytes()) == bbb
 
+    # NOTE: This custom class node does not set metadata in SerializationContext, meaning
+    # that metadata has to be handled in the class node instead of the type nodes.
     @dataclass(frozen=True)
     class TLVClassNode[T](ClassNode[T]):
         def read_from(
             self, reader: EndianedReaderIOBase, context: SerializationContext
         ):
-            read_context = context.fork()
+            read_context = context.fork(state={})
 
             fields_by_id = {
-                node_metadata.get("id", 0): (name, node, node_metadata)
-                for name, node, node_metadata in zip(
-                    self.names, self.nodes, self.metadatas
-                )
+                member.metadata.get("id", 0): member for member in self.members
             }
 
             assert reader.read_u8() == 0x50, "invalid struct start"
@@ -118,38 +109,38 @@ else:
 
                 type = reader.read_u8()
 
-                name, node, node_metadata = fields_by_id[id]
-                assert node_metadata.get("type_id", 0) == type, "Invalid type id"
+                member = fields_by_id[id]
+                assert member.metadata.get("type_id", 0) == type, "Invalid type id"
 
-                read_context.state[name] = node.read_from(reader, read_context)
+                read_context.state[member.name] = member.node.read_from(
+                    reader, read_context
+                )
 
-            for name, _, _ in fields_by_id.values():
-                if name not in read_context.state:
-                    read_context.state[name]
+            for member in fields_by_id.values():
+                if member.name not in read_context.state:
+                    read_context.state[member.name] = None
 
             return self.call(read_context.state)
 
         def write_to(
             self, value, writer: EndianedWriterIOBase, context: SerializationContext
         ):
-            write_context = context.fork(value)
+            write_context = context.fork(state=value)
 
             size = 0
 
             size += writer.write_u8(0x50)
 
-            for name, node, node_metadata in zip(
-                self.names, self.nodes, self.metadatas
-            ):
-                member_value = getattr(value, name)
+            for member in self.members:
+                member_value = getattr(value, member.name)
                 if member_value is None:
                     continue
 
-                assert node_metadata.get("id", 0) != 0xFF, "invalid member id 0xFF"
+                assert member.metadata.get("id", 0) != 0xFF, "invalid member id 0xFF"
 
-                size += writer.write_u8(node_metadata.get("id", 0))
-                size += writer.write_u8(node_metadata.get("type_id", 0))
-                size += node.write_to(member_value, writer, write_context)
+                size += writer.write_u8(member.metadata.get("id", 0))
+                size += writer.write_u8(member.metadata.get("type_id", 0))
+                size += member.node.write_to(member_value, writer, write_context)
 
             size += writer.write_u8(0xFF)
 

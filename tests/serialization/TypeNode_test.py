@@ -47,6 +47,7 @@ else:
         U16Node,
         U32Node,
         U64Node,
+        ClassNodeMember,
     )
     from bier.serialization.Serializable import SerializationContext
     from tests.EndianedBinaryIO.EndianedIOTestHelper import EndianedIOTestHelper
@@ -206,12 +207,11 @@ else:
             (
                 ClassNode,
                 (
-                    # nodes
-                    (U8Node(), StringNode()),
-                    # names
-                    ("u8v", "strv"),
-                    # metadatas
-                    ({}, {}),
+                    # members
+                    (
+                        ClassNodeMember("u8v", U8Node(), {}),
+                        ClassNodeMember("strv", StringNode(), {}),
+                    ),
                     # call
                     DummyClass.from_dict,
                 ),
@@ -255,12 +255,14 @@ else:
             (
                 ClassNode,
                 (
-                    # nodes
-                    (StringNode(StaticLengthNode(len("cool string!"))),),
-                    # names
-                    ("string_value",),
-                    # metadatas
-                    ({},),
+                    # members
+                    (
+                        ClassNodeMember(
+                            "string_value",
+                            StringNode(StaticLengthNode(len("cool string!"))),
+                            {},
+                        ),
+                    ),
                     # call
                     DummyClassWithStaticLength.from_dict,
                 ),
@@ -273,12 +275,8 @@ else:
             (
                 ClassNode,
                 (
-                    # nodes
-                    (StringNode(U8Node()),),
-                    # names
-                    ("string_value",),
-                    # metadatas
-                    ({},),
+                    # members
+                    (ClassNodeMember("string_value", StringNode(U8Node()), {}),),
                     # call
                     DummyClassWithPrefixedLength.from_dict,
                 ),
@@ -291,12 +289,15 @@ else:
             (
                 ClassNode,
                 (
-                    # nodes
-                    (U8Node(), StringNode(MemberLengthNode("string_length"))),
-                    # names
-                    ("string_length", "string_value"),
-                    # metadatas
-                    ({}, {}),
+                    # members
+                    (
+                        ClassNodeMember("string_length", U8Node(), {}),
+                        ClassNodeMember(
+                            "string_value",
+                            StringNode(MemberLengthNode("string_length")),
+                            {},
+                        ),
+                    ),
                     # call
                     DummyClassWithMemberLength.from_dict,
                 ),
