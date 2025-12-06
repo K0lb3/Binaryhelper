@@ -1138,6 +1138,23 @@ PyObject *EndianedBytesIO_writelines(EndianedBytesIO *self, PyObject *arg)
     return nullptr;
 }
 
+static PyObject *EndianedBytesIO_read_exactly(EndianedBytesIO *self, PyObject *arg)
+{
+    CHECK_CLOSED
+    Py_ssize_t size = 0;
+    if (PyLong_Check(arg))
+    {
+        // EndianedBytesIO::read already always reads the exact amount, so we can
+        // fallback to that here.
+        return EndianedBytesIO_read(self, arg);
+    }
+    else
+    {
+        PyErr_SetString(PyExc_TypeError, "Argument must be an integer.");
+        return nullptr;
+    }
+}
+
 static PyMethodDef EndianedBytesIO_methods[] = {
     GENERATE_ENDIANEDIOBASE_BASE_FUNCTIONS(EndianedBytesIO),
     {"read1", reinterpret_cast<PyCFunction>(EndianedBytesIO_read), METH_O, "Read bytes from the buffer."},       // basically fullfilling it with normal read

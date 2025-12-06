@@ -83,7 +83,8 @@
         {"readlines", reinterpret_cast<PyCFunction>(EndianedIOClass##_readlines), METH_VARARGS, "Read multiple lines from the buffer."}, \
         {"align", reinterpret_cast<PyCFunction>(EndianedIOClass##_align), METH_O, "Align the position of the buffer."},                  \
         {"write", reinterpret_cast<PyCFunction>(EndianedIOClass##_write), METH_O, "Write bytes to the buffer."},                         \
-        {"writelines", reinterpret_cast<PyCFunction>(EndianedIOClass##_writelines), METH_O, "Write multiple lines to the buffer."}
+        {"writelines", reinterpret_cast<PyCFunction>(EndianedIOClass##_writelines), METH_O, "Write multiple lines to the buffer."},      \
+        {"read_exactly", reinterpret_cast<PyCFunction>(EndianedIOClass##_read_exactly), METH_O, "Reads an exact number of bytes."}
 
 #define _GENERATE_ENDIANEDIOBASE_WRITE_FUNCTIONS_TYPE(EndianedIOClass, T)                                                                                         \
     {"write_" #T, reinterpret_cast<PyCFunction>(EndianedIOClass##_write_t<T, '|'>), METH_O, "Write a " #T " value."},                                             \

@@ -470,6 +470,29 @@ class EndianedReaderIOBase(IOBase, metaclass=abc.ABCMeta):
             count = self.read_count()
         return tuple(self.read_signed_varint() for _ in range(count))
 
+    def read_exactly(self, count: int) -> bytes:
+        """Reads exactly count bytes from the stream.
+
+        Args:
+            count (int): The number of bytes to read.
+
+        Returns:
+            bytes: The read bytes.
+        """
+        data = b""
+
+        remaining = count
+        while remaining != 0:
+            data += self.read(remaining)
+            if len(data) > count:
+                raise RuntimeError(
+                    f"Read {len(data) - count} too many bytes from input stream."
+                )
+
+            remaining = count - len(data)
+
+        return data
+
 
 class EndianedWriterIOBase(IOBase, metaclass=abc.ABCMeta):
     endian: Endianess
