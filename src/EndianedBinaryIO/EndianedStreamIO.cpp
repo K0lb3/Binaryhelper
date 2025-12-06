@@ -482,7 +482,7 @@ static PyObject *EndianedStreamIO_read_string(EndianedStreamIO *self, PyObject *
     return result;
 }
 
-std::optional<Py_ssize_t> EndianedStreamIO_read_varint_internal(EndianedStreamIO *self) 
+std::optional<Py_ssize_t> EndianedStreamIO_read_varint_internal(EndianedStreamIO *self)
 {
     Py_ssize_t value = 0;
     uint32_t shift = 0;
@@ -824,8 +824,8 @@ static PyObject *EndianedStreamIO_write_varint_internal(EndianedStreamIO *self, 
     {
         return nullptr;
     }
-    
-    if constexpr (IsSigned) 
+
+    if constexpr (IsSigned)
     {
         value = (value << 1) | (value < 0 ? 1 : 0);
     }
@@ -837,7 +837,7 @@ static PyObject *EndianedStreamIO_write_varint_internal(EndianedStreamIO *self, 
             return nullptr;
         }
     }
-    
+
     // Create a bytes object to hold the varint
     char buffer[10]; // Varint can be at most 10 bytes for 64-bit integers
     int index = 0;
@@ -858,7 +858,7 @@ static PyObject *EndianedStreamIO_write_varint_internal(EndianedStreamIO *self, 
 }
 
 template<bool IsSigned>
-static PyObject *EndianedStreamIO_write_varint_array_internal(EndianedStreamIO *self, PyObject *args, PyObject *kwds) 
+static PyObject *EndianedStreamIO_write_varint_array_internal(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
 {
         static const char *kwlist[] = {
         "v",
@@ -905,7 +905,7 @@ static PyObject *EndianedStreamIO_write_varint_array_internal(EndianedStreamIO *
                 value = (value << 1) | 0;
             }
         }
-        else 
+        else
         {
             if (value < 0)
             {
@@ -913,7 +913,7 @@ static PyObject *EndianedStreamIO_write_varint_array_internal(EndianedStreamIO *
                 Py_DecRef(item);
                 Py_DecRef(iter);
                 return nullptr;
-            }    
+            }
         }
 
         do

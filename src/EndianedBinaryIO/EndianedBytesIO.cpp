@@ -523,7 +523,7 @@ static PyObject *EndianedBytesIO_write_varint_internal(EndianedBytesIO *self, Py
     {
         return nullptr;
     }
-    
+
     if constexpr (IsSigned)
     {
         if (value < 0)
@@ -543,7 +543,7 @@ static PyObject *EndianedBytesIO_write_varint_internal(EndianedBytesIO *self, Py
             return nullptr;
         }
     }
-    
+
     // Calculate the number of bytes needed for the varint
     Py_ssize_t write_size = 0;
     uint64_t temp = value;
@@ -973,7 +973,7 @@ static PyObject *EndianedBytesIO_readlines(EndianedBytesIO *self, PyObject *size
     return result;
 }
 
-static std::optional<Py_ssize_t> EndianedBytesIO_read_varint_internal(EndianedBytesIO* self) 
+static std::optional<Py_ssize_t> EndianedBytesIO_read_varint_internal(EndianedBytesIO* self)
 {
     Py_ssize_t value = 0;
     uint32_t shift = 0;
@@ -1005,9 +1005,9 @@ static std::optional<Py_ssize_t> EndianedBytesIO_read_varint_internal(EndianedBy
 static PyObject *EndianedBytesIO_read_varint(EndianedBytesIO *self, PyObject *args)
 {
     CHECK_CLOSED
-    
+
     const auto value = EndianedBytesIO_read_varint_internal(self);
-    if (!value) 
+    if (!value)
     {
         return nullptr;
     }
@@ -1049,9 +1049,9 @@ static PyObject *EndianedBytesIO_read_varint_array(EndianedBytesIO *self, PyObje
 static PyObject *EndianedBytesIO_read_signed_varint(EndianedBytesIO *self, PyObject *args)
 {
     CHECK_CLOSED
-    
+
     const auto value = EndianedBytesIO_read_varint_internal(self);
-    if (!value) 
+    if (!value)
     {
         return nullptr;
     }
