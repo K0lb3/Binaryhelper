@@ -380,7 +380,7 @@ class EndianedReaderIOBase(IOBase, metaclass=abc.ABCMeta):
             if not char or char == b"\x00":
                 break
             string += char
-        return string.decode("utf-8", errors=errors)
+        return string.decode(encoding, errors=errors)
 
     def read_string(
         self,
