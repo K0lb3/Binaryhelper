@@ -26,6 +26,8 @@ from .builtins import (
     u32,
     u64,
     varint,
+    uvarint,
+    svarint,
 )
 from .options import (
     convert,
