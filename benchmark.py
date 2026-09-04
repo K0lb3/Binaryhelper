@@ -20,7 +20,7 @@ def benchmark(get_instance):
     times = []
     for i in range(len(TEST_DATA)):
         start = time_ns()
-        c = instance.read_u8()
+        c = instance.read_u8()  # noqa: F841
         end = time_ns()
         times.append(end - start)
         # assert c == i, f"Expected {i}, got {c}"

@@ -47,17 +47,19 @@ else:
         U16Node,
         U32Node,
         U64Node,
+        ClassNodeMember,
     )
+    from bier.serialization.Serializable import SerializationContext
     from tests.EndianedBinaryIO.EndianedIOTestHelper import EndianedIOTestHelper
 
     HELPER = EndianedIOTestHelper()
 
     def test_primitive_node_singleton():
         class TestPrimitiveNode(PrimitiveNode):
-            def read_from(self, reader, context=None):
+            def read_from(self, reader, context):
                 raise NotImplementedError("This is a test node, not for actual use.")
 
-            def write_to(self, value, writer, context=None):
+            def write_to(self, value, writer, context):
                 raise NotImplementedError("This is a test node, not for actual use.")
 
         node1 = TestPrimitiveNode()
@@ -90,7 +92,7 @@ else:
         values = getattr(HELPER, name)
         writer = EndianedBytesIO(endian="<")
         for value in values:
-            node.write_to(value, writer)
+            node.write_to(value, writer, SerializationContext())
 
         bytes_written = writer.tell()
         assert bytes_written == node.size * len(values), (
@@ -103,7 +105,9 @@ else:
 
         # Test read
         writer.seek(0)
-        values_read = [node.read_from(writer) for _ in range(len(values))]
+        values_read = [
+            node.read_from(writer, SerializationContext()) for _ in range(len(values))
+        ]
         assert values_read == values, f"Expected {values}, got {values_read}"
 
         assert writer.tell() == node.size * len(getattr(HELPER, name))
@@ -203,10 +207,11 @@ else:
             (
                 ClassNode,
                 (
-                    # nodes
-                    (U8Node(), StringNode()),
-                    # names
-                    ("u8v", "strv"),
+                    # members
+                    (
+                        ClassNodeMember("u8v", U8Node(), {}),
+                        ClassNodeMember("strv", StringNode(), {}),
+                    ),
                     # call
                     DummyClass.from_dict,
                 ),
@@ -250,10 +255,14 @@ else:
             (
                 ClassNode,
                 (
-                    # nodes
-                    (StringNode(StaticLengthNode(len("cool string!"))),),
-                    # names
-                    ("string_value",),
+                    # members
+                    (
+                        ClassNodeMember(
+                            "string_value",
+                            StringNode(StaticLengthNode(len("cool string!"))),
+                            {},
+                        ),
+                    ),
                     # call
                     DummyClassWithStaticLength.from_dict,
                 ),
@@ -266,10 +275,8 @@ else:
             (
                 ClassNode,
                 (
-                    # nodes
-                    (StringNode(U8Node()),),
-                    # names
-                    ("string_value",),
+                    # members
+                    (ClassNodeMember("string_value", StringNode(U8Node()), {}),),
                     # call
                     DummyClassWithPrefixedLength.from_dict,
                 ),
@@ -282,10 +289,15 @@ else:
             (
                 ClassNode,
                 (
-                    # nodes
-                    (U8Node(), StringNode(MemberLengthNode("string_length"))),
-                    # names
-                    ("string_length", "string_value"),
+                    # members
+                    (
+                        ClassNodeMember("string_length", U8Node(), {}),
+                        ClassNodeMember(
+                            "string_value",
+                            StringNode(MemberLengthNode("string_length")),
+                            {},
+                        ),
+                    ),
                     # call
                     DummyClassWithMemberLength.from_dict,
                 ),
@@ -309,7 +321,7 @@ else:
         # Test write
         writer = EndianedBytesIO(endian="<")
         try:
-            node.write_to(value, writer)
+            node.write_to(value, writer, SerializationContext())
         except Exception as e:
             if error and isinstance(e, error):
                 return
@@ -320,5 +332,5 @@ else:
 
         # Test read
         writer.seek(0)
-        value_read = node.read_from(writer)
+        value_read = node.read_from(writer, SerializationContext())
         assert value_read == value, f"Expected {value}, got {value_read}"

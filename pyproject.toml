@@ -7,24 +7,24 @@ name = "bier"
 authors = [{ name = "Rudolf Kolbe", email = "rkolbe96@gmail.com" }]
 description = "Endian-aware binary IO streams and annotation driven serialization helpers"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.8"
 classifiers = [
-    "Operating System :: OS Independent",
-    "Intended Audience :: Developers",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
-    "Topic :: Software Development :: Libraries :: Python Modules",
+  "Operating System :: OS Independent",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "typing-extensions>=4.6; python_version >= '3.8' and python_version < '3.12'",
+  "typing-extensions>=4.6; python_version >= '3.8' and python_version < '3.12'",
 ]
 dynamic = ["version"]
 
@@ -32,6 +32,7 @@ dynamic = ["version"]
 # optional dependencies must be lowercase/normalized
 tests = ["pytest"]
 dev = ["ruff", "pre-commit", "bier[tests]"]
+dev_uv = ["ruff", "pre-commit-uv", "bier[tests]"]
 
 [project.urls]
 "Homepage" = "https://github.com/K0lb3/Binaryhelper"
@@ -61,6 +62,9 @@ archs = ["AMD64", "ARM64"]
 pythonVersion = "3.12"
 
 [tool.hatch.envs.default]
-features = [
-  "dev",
-]
+features = ["dev_uv"]
+installer = "uv"
+python = "3.14"
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.14"]

@@ -25,6 +25,9 @@ from .builtins import (
     u16,
     u32,
     u64,
+    varint,
+    uvarint,
+    svarint,
 )
 from .options import (
     convert,
@@ -33,6 +36,7 @@ from .options import (
     prefixed_length,
     static_length,
     member_length,
+    custom_root_node,
 )
 from .TypeNode import (
     ClassNode,
@@ -41,4 +45,7 @@ from .TypeNode import (
     StringNode,
     TupleNode,
     TypeNode,
+)
+from .Serializable import (
+    SerializationContext,
 )

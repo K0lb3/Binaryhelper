@@ -1,11 +1,13 @@
 #include <concepts>
 #include <cstdint>
 #include <bit>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <vector>
 
 #include "Python.h"
+#include "pyconfig.h"
 #include "structmember.h"
 
 #include "PyConverter.hpp"
@@ -480,7 +482,7 @@ static PyObject *EndianedStreamIO_read_string(EndianedStreamIO *self, PyObject *
     return result;
 }
 
-static PyObject *EndianedStreamIO_read_varint(EndianedStreamIO *self, PyObject *args)
+std::optional<Py_ssize_t> EndianedStreamIO_read_varint_internal(EndianedStreamIO *self)
 {
     Py_ssize_t value = 0;
     uint32_t shift = 0;
@@ -488,7 +490,7 @@ static PyObject *EndianedStreamIO_read_varint(EndianedStreamIO *self, PyObject *
     PyObject *py_buffer = PyBytes_FromStringAndSize(nullptr, 1);
     if (py_buffer == nullptr)
     {
-        return nullptr;
+        return std::nullopt;
     }
     char *byte_buffer = PyBytes_AsString(py_buffer);
 
@@ -502,7 +504,7 @@ static PyObject *EndianedStreamIO_read_varint(EndianedStreamIO *self, PyObject *
         {
             Py_DecRef(read_bytes_count);
             Py_DecRef(py_buffer);
-            return nullptr;
+            return std::nullopt;
         }
         Py_ssize_t read_size = PyBytes_Size(read_bytes_count);
         if (read_size < 1)
@@ -510,7 +512,7 @@ static PyObject *EndianedStreamIO_read_varint(EndianedStreamIO *self, PyObject *
             PyErr_SetString(PyExc_ValueError, "Read exceeds buffer length.");
             Py_DecRef(read_bytes_count);
             Py_DecRef(py_buffer);
-            return nullptr;
+            return std::nullopt;
         }
         Py_DecRef(read_bytes_count);
 
@@ -523,10 +525,22 @@ static PyObject *EndianedStreamIO_read_varint(EndianedStreamIO *self, PyObject *
         if (shift >= sizeof(Py_ssize_t) * 8)
         {
             PyErr_SetString(PyExc_OverflowError, "Varint too large.");
-            return nullptr;
+            return std::nullopt;
         }
     }
-    return PyLong_FromSsize_t(value);
+
+    return value;
+}
+
+static PyObject *EndianedStreamIO_read_varint(EndianedStreamIO *self, PyObject *args)
+{
+    const auto value = EndianedStreamIO_read_varint_internal(self);
+    if (!value)
+    {
+        return nullptr;
+    }
+
+    return PyLong_FromSsize_t(value.value());
 }
 
 static PyObject *EndianedStreamIO_read_varint_array(EndianedStreamIO *self, PyObject *args)
@@ -543,6 +557,47 @@ static PyObject *EndianedStreamIO_read_varint_array(EndianedStreamIO *self, PyOb
     for (Py_ssize_t i = 0; i < size; ++i)
     {
         PyObject *item = EndianedStreamIO_read_varint(self, nullptr);
+        if (item == nullptr)
+        {
+            Py_DecRef(ret);
+            return nullptr;
+        }
+        PyTuple_SetItem(ret, i, item); // Steal reference, no need to DECREF
+    }
+    return ret;
+}
+
+static PyObject *EndianedStreamIO_read_signed_varint(EndianedStreamIO *self, PyObject *args)
+{
+    const auto value = EndianedStreamIO_read_varint_internal(self);
+    if (!value)
+    {
+        return nullptr;
+    }
+
+    Py_ssize_t varint_value = value.value() >> 1;
+    if (value.value() & 1)
+    {
+        varint_value = -(varint_value + 1);
+    }
+
+    return PyLong_FromSsize_t(varint_value);
+}
+
+static PyObject *EndianedStreamIO_read_signed_varint_array(EndianedStreamIO *self, PyObject *args)
+{
+    Py_ssize_t size = 0;
+
+    if (!_read_count(self, args, size))
+    {
+        return nullptr;
+    }
+
+    PyObject *ret = PyTuple_New(size);
+
+    for (Py_ssize_t i = 0; i < size; ++i)
+    {
+        PyObject *item = EndianedStreamIO_read_signed_varint(self, nullptr);
         if (item == nullptr)
         {
             Py_DecRef(ret);
@@ -761,17 +816,26 @@ static PyObject *EndianedStreamIO_write_bytes(EndianedStreamIO *self, PyObject *
     return _EndianedStreamIO_write_buffer(self, v.obj);
 }
 
-static PyObject *EndianedStreamIO_write_varint(EndianedStreamIO *self, PyObject *arg)
+template<bool IsSigned>
+static PyObject *EndianedStreamIO_write_varint_internal(EndianedStreamIO *self, PyObject *arg)
 {
     Py_ssize_t value = 0;
     if (!PyArg_ParseTuple(arg, "n", &value))
     {
         return nullptr;
     }
-    if (value < 0)
+
+    if constexpr (IsSigned)
     {
-        PyErr_SetString(PyExc_ValueError, "Varint must be non-negative.");
-        return nullptr;
+        value = (value << 1) | (value < 0 ? 1 : 0);
+    }
+    else
+    {
+        if (value < 0)
+        {
+            PyErr_SetString(PyExc_ValueError, "Varint must be non-negative.");
+            return nullptr;
+        }
     }
 
     // Create a bytes object to hold the varint
@@ -793,9 +857,10 @@ static PyObject *EndianedStreamIO_write_varint(EndianedStreamIO *self, PyObject 
     return _EndianedStreamIO_write_raw(self, buffer, index);
 }
 
-static PyObject *EndianedStreamIO_write_varint_array(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
+template<bool IsSigned>
+static PyObject *EndianedStreamIO_write_varint_array_internal(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
 {
-    static const char *kwlist[] = {
+        static const char *kwlist[] = {
         "v",
         "write_count",
         nullptr};
@@ -828,13 +893,29 @@ static PyObject *EndianedStreamIO_write_varint_array(EndianedStreamIO *self, PyO
     {
         // Encode the integer as a varint
         Py_ssize_t value = PyLong_AsSsize_t(item);
-        if (value < 0)
+
+        if constexpr (IsSigned)
         {
-            PyErr_SetString(PyExc_ValueError, "Varint must be non-negative.");
-            Py_DecRef(item);
-            Py_DecRef(iter);
-            return nullptr;
+            if (value < 0)
+            {
+                value = ((-value - 1) << 1) | 1;
+            }
+            else
+            {
+                value = (value << 1) | 0;
+            }
         }
+        else
+        {
+            if (value < 0)
+            {
+                PyErr_SetString(PyExc_ValueError, "Varint must be non-negative.");
+                Py_DecRef(item);
+                Py_DecRef(iter);
+                return nullptr;
+            }
+        }
+
         do
         {
             uint8_t byte = value & 0x7F; // Get the lowest 7 bits
@@ -858,6 +939,26 @@ static PyObject *EndianedStreamIO_write_varint_array(EndianedStreamIO *self, PyO
     Py_DecRef(iter);
 
     return _EndianedStreamIO_write_raw(self, buffer.data(), buf_ptr - buffer.data());
+}
+
+static PyObject *EndianedStreamIO_write_varint(EndianedStreamIO *self, PyObject *arg)
+{
+    return EndianedStreamIO_write_varint_internal<false>(self, arg);
+}
+
+static PyObject *EndianedStreamIO_write_varint_array(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
+{
+    return EndianedStreamIO_write_varint_array_internal<false>(self, args, kwds);
+}
+
+static PyObject *EndianedStreamIO_write_signed_varint(EndianedStreamIO *self, PyObject *arg)
+{
+    return EndianedStreamIO_write_varint_internal<true>(self, arg);
+}
+
+static PyObject *EndianedStreamIO_write_signed_varint_array(EndianedStreamIO *self, PyObject *args, PyObject *kwds)
+{
+    return EndianedStreamIO_write_varint_array_internal<true>(self, args, kwds);
 }
 
 PyMethodDef EndianedStreamIO_methods[] = {

@@ -1,7 +1,7 @@
-from enum import Enum, IntEnum, IntFlag, StrEnum
+from enum import Enum, Flag, IntEnum, IntFlag, StrEnum
 from functools import cache
 from inspect import isclass
-from types import get_original_bases
+from types import get_original_bases, NoneType, UnionType
 from typing import (
     Annotated,
     Any,
@@ -9,6 +9,8 @@ from typing import (
     get_args,
     get_type_hints,
     ClassVar,
+    cast,
+    Union,
 )
 
 from ._typing_helpers import get_origin_type, resolve_genericalias
@@ -27,7 +29,8 @@ from .builtins import (
     u64,
 )
 from .options import BinarySerializableOptions, convert, custom, member
-from .Serializable import Serializable
+from .metadata import parse_metadata_annotation, is_metadata_annotation
+from .Serializable import Serializable, SerializationContext
 from .TypeNode import (
     BytesNode,
     ClassNode,
@@ -38,6 +41,7 @@ from .TypeNode import (
     StructNode,
     TupleNode,
     TypeNode,
+    ClassNodeMember,
 )
 
 PRIMITIVES = (
@@ -66,18 +70,23 @@ class BinarySerializable[*TOptions](Serializable):
 
     @classmethod
     def read_from(cls, reader, context=None):
-        return cls._get_node().read_from(reader, context)
+        return cls._get_node().read_from(reader, context or SerializationContext())
 
     def write_to(self, writer, context=None):
-        return self._get_node().write_to(self, writer, context)
+        return self._get_node().write_to(
+            self, writer, context or SerializationContext()
+        )
 
 
 def get_binary_serializable_spec(cls: type[BinarySerializable]) -> Any:
-    for base in get_original_bases(cls):
-        if get_origin_type(base) is BinarySerializable:
-            return base
+    if get_origin_type(cls) is BinarySerializable:
+        return cls
 
-    raise ValueError(f"Type {cls} does not inherit from BinarySerializable")
+    for base in get_original_bases(cls):
+        if (spec := get_binary_serializable_spec(base)) is not None:
+            return spec
+
+    return None
 
 
 def parse_enum_base_type(clz: type[Enum]) -> type:
@@ -86,12 +95,17 @@ def parse_enum_base_type(clz: type[Enum]) -> type:
             return value_type
 
     bases = get_original_bases(clz)
-    assert len(bases) == 2, "enum member must have two arguments"
-    assert bases[1] is Enum, "enum second base type must be Enum"
+    assert len(bases) == 2, "enum/flag member must have two arguments"
+    assert bases[1] is Enum or bases[1] is Flag, (
+        "enum/flag second base type must be Enum or Flag"
+    )
     return bases[0]
 
 
-def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> TypeNode:
+def parse_annotation(
+    annotation: Any,
+    options: BinarySerializableOptions,
+) -> TypeNode:
     if annotation in PRIMITIVES:
         args = get_args(annotation)
         assert len(args) >= 2 and issubclass(args[1], TypeNode), (
@@ -125,11 +139,13 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
         )
 
     if origin is custom:
-        assert len(args) >= 1, "member must have at least one argument"
+        assert len(args) >= 1, "custom must have at least one argument"
         member_type = args[0]
         member_options = options
+
         for option in args[1:]:
-            member_options = member_options.update_by_type(option)
+            if not is_metadata_annotation(option):
+                member_options = member_options.update_by_type(option)
 
         return parse_annotation(member_type, member_options)
 
@@ -152,6 +168,20 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
             elif issubclass(arg, BinarySerializable):
                 return StructNode(clz=arg)
 
+    if origin is Union or origin is UnionType:
+        # todo: do we want to support other constructs other than T | None?
+        # maybe parsing them yes, but not in the default ClassNode parser?
+        # could be useful for custom union parsers
+
+        assert len(args) == 2 and (args[0] is NoneType or args[1] is NoneType), (
+            "only <T> | None union constructs are currently supported"
+        )
+
+        return parse_annotation(
+            args[0] if args[0] is not NoneType else args[1],
+            options,
+        )
+
     if isclass(annotation):
         if issubclass(annotation, Serializable):
             return StructNode(clz=annotation)
@@ -172,6 +202,30 @@ def parse_annotation(annotation: Any, options: BinarySerializableOptions) -> Typ
     )
 
 
+def parse_metadata(
+    annotation: Any,
+    options: BinarySerializableOptions,
+) -> dict[str, Any]:
+    origin = get_origin_type(annotation)
+    args = get_args(annotation)
+
+    if origin is custom:
+        metadata = {}
+        for option in args[1:]:
+            if is_metadata_annotation(option):
+                metadata |= parse_metadata_annotation(option)
+
+        return metadata
+
+    if hasattr(annotation, "__value__"):
+        return parse_metadata(
+            resolve_genericalias(origin, args),
+            options=options,
+        )
+
+    return {}
+
+
 def get_serialization_options(
     arguments: tuple[Any, ...], current_options: BinarySerializableOptions
 ) -> BinarySerializableOptions:
@@ -187,6 +241,9 @@ def get_serialization_options(
 
 def get_type_serialization_options(cls: type[BinarySerializable]):
     spec = get_binary_serializable_spec(cls)
+    if spec is None:
+        raise ValueError(f"Type {cls} does not inherit from BinarySerializable")
+
     arguments = get_args(spec)
     return get_serialization_options(arguments, BinarySerializableOptions())
 
@@ -206,15 +263,16 @@ def build_type_node[T: BinarySerializable](cls: type[T]) -> ClassNode[T]:
         if get_origin_type(value) is not ClassVar
     }
 
-    names = tuple(type_hints.keys())
-    nodes = tuple(
-        parse_annotation(annotation, serialization_options)
-        for annotation in type_hints.values()
-    )
+    members = []
+    for name, annotation in type_hints.items():
+        node = parse_annotation(annotation, serialization_options)
+        metadata = parse_metadata(annotation, serialization_options)
+        members.append(ClassNodeMember(name, node, metadata))
 
-    return ClassNode(
-        names=names,
-        nodes=nodes,
+    class_node_type = cast(type[ClassNode[T]], serialization_options.root_node_type)
+
+    return class_node_type(
+        members=tuple(members),
         call=cls.from_dict,
     )
 

@@ -3,9 +3,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, ClassVar, Self, Sequence
 
-from .Serializable import Serializable, Serializer
+from .Serializable import Serializable, Serializer, SerializationContext
+from ..EndianedBinaryIO import EndianedReaderIOBase, EndianedWriterIOBase
 
 
+@dataclass(frozen=True)
 class TypeNode[T](Serializer[T], metaclass=ABCMeta): ...
 
 
@@ -18,10 +20,10 @@ class StaticLengthNode(TypeNode[int]):
 
     size: int
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return self.size
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         assert value == self.size, f"Expected {self.size} values, got {value} values"
         return 0
 
@@ -34,7 +36,7 @@ class MemberLengthNode(TypeNode[int]):
 
     member_name: str
 
-    def _get_member_value(self, context) -> int:
+    def _get_member_value(self, context: dict[str, Any] | Any) -> int:
         value = (
             context.get(self.member_name, None)
             if isinstance(context, dict)
@@ -46,13 +48,13 @@ class MemberLengthNode(TypeNode[int]):
 
         return value
 
-    def read_from(self, reader, context=None):
-        assert isinstance(context, dict), "Context was not a dictionary of values"
-        return self._get_member_value(context)
+    def read_from(self, reader, context):
+        assert isinstance(context.state, dict), "Context was not a dictionary of values"
+        return self._get_member_value(context.state)
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         # context here is an instance of the class
-        expected_length = self._get_member_value(context)
+        expected_length = self._get_member_value(context.state)
         assert value == expected_length, (
             f"Expected {expected_length} values, got {value} values"
         )
@@ -90,110 +92,110 @@ PRIMITIVE_INSTANCE_MAP: PrimitiveInstanceMapType = {}
 class U8Node(PrimitiveNode[int]):
     size = 1
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_u8()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_u8(value)
 
 
 class U16Node(PrimitiveNode[int]):
     size = 2
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_u16()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_u16(value)
 
 
 class U32Node(PrimitiveNode[int]):
     size = 4
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_u32()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_u32(value)
 
 
 class U64Node(PrimitiveNode[int]):
     size = 8
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_u64()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_u64(value)
 
 
 class I8Node(PrimitiveNode[int]):
     size = 1
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_i8()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_i8(value)
 
 
 class I16Node(PrimitiveNode[int]):
     size = 2
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_i16()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_i16(value)
 
 
 class I32Node(PrimitiveNode[int]):
     size = 4
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_i32()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_i32(value)
 
 
 class I64Node(PrimitiveNode[int]):
     size = 8
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_i64()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_i64(value)
 
 
 class F16Node(PrimitiveNode[float]):
     size = 2
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_f16()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_f16(value)
 
 
 class F32Node(PrimitiveNode[float]):
     size = 4
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_f32()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_f32(value)
 
 
 class F64Node(PrimitiveNode[float]):
     size = 8
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return reader.read_f64()
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         return writer.write_f64(value)
 
 
@@ -209,7 +211,7 @@ class StringNode(TypeNode[str]):
     encoding: str = "utf-8"
     errors: str = "surrogateescape"
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         if self.size_node is None:
             # C-style string
             return reader.read_cstring()
@@ -218,7 +220,7 @@ class StringNode(TypeNode[str]):
             length = self.size_node.read_from(reader, context)
             return reader.read(length).decode(self.encoding, self.errors)
 
-    def write_to(self, value, writer, context=None):
+    def write_to(self, value, writer, context):
         if self.size_node is None:
             # C-style string
             return writer.write_cstring(value)
@@ -239,11 +241,11 @@ class BytesNode(TypeNode[bytes]):
 
     size_node: TypeNode[int]
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         length = self.size_node.read_from(reader, context)
         return reader.read(length)
 
-    def write_to(self, value: bytes, writer, context=None) -> int:
+    def write_to(self, value: bytes, writer, context) -> int:
         total_size = self.size_node.write_to(len(value), writer, context)
         total_size += writer.write(value)
         return total_size
@@ -260,12 +262,12 @@ class ListNode[T](TypeNode[list[T]]):
     elem_node: TypeNode[T]
     size_node: TypeNode[int]
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         # TODO: change context to be read list fields?
         length = self.size_node.read_from(reader, context)
         return [self.elem_node.read_from(reader, context) for _ in range(length)]
 
-    def write_to(self, value: Sequence[T], writer, context=None) -> int:
+    def write_to(self, value: Sequence[T], writer, context) -> int:
         total_size = self.size_node.write_to(len(value), writer, context)
         total_size += sum(
             self.elem_node.write_to(element, writer, context) for element in value
@@ -279,35 +281,67 @@ class TupleNode[T](TypeNode[tuple[T, ...]]):
 
     nodes: tuple[TypeNode[T], ...]
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         # TODO: change context to be read tuple fields?
         return tuple(node.read_from(reader, context) for node in self.nodes)
 
-    def write_to(self, value: tuple[T, ...], writer, context=None) -> int:
+    def write_to(self, value: tuple[T, ...], writer, context) -> int:
         return sum(
             node.write_to(val, writer, context) for node, val in zip(self.nodes, value)
         )
 
 
 @dataclass(frozen=True)
+class ClassNodeMember:
+    """Represents information about a member of a given ClassNode."""
+
+    name: str
+    node: TypeNode
+    metadata: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class ClassNode[T](TypeNode[T]):
     """ClassNode relates to a class of parsable nodes of different types."""
 
-    nodes: tuple[TypeNode, ...]
-    names: tuple[str, ...]
+    members: tuple[ClassNodeMember, ...]
     call: Callable[[dict[str, Any]], T]
 
-    def read_from(self, reader, context=None):
-        read_fields = {}
-        for name, node in zip(self.names, self.nodes):
-            read_fields[name] = node.read_from(reader, read_fields)
+    def _read_member(
+        self,
+        member: ClassNodeMember,
+        reader: EndianedReaderIOBase,
+        context: SerializationContext,
+    ) -> Any:
+        member_read_context = context.fork(metadata=member.metadata)
+        return member.node.read_from(reader, member_read_context)
 
-        return self.call(read_fields)
+    def _write_member(
+        self,
+        value: T,
+        member: ClassNodeMember,
+        writer: EndianedWriterIOBase,
+        context: SerializationContext,
+    ) -> int:
+        member_write_context = context.fork(metadata=member.metadata)
+        return member.node.write_to(
+            getattr(value, member.name), writer, member_write_context
+        )
 
-    def write_to(self, value: T, writer, context=None):
+    def read_from(self, reader, context):
+        read_context = context.fork(state={})
+        for member in self.members:
+            read_context.state[member.name] = self._read_member(
+                member, reader, read_context
+            )
+
+        return self.call(read_context.state)
+
+    def write_to(self, value: T, writer, context):
+        write_context = context.fork(state=value)
         return sum(
-            node.write_to(getattr(value, name), writer, value)
-            for name, node in zip(self.names, self.nodes)
+            self._write_member(value, member, writer, write_context)
+            for member in self.members
         )
 
 
@@ -317,10 +351,10 @@ class StructNode[T: Serializable](TypeNode[T]):
 
     clz: type[T]
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return self.clz.read_from(reader, context)
 
-    def write_to(self, value: T, writer, context=None):
+    def write_to(self, value: T, writer, context):
         assert isinstance(value, self.clz), f"Expected {self.clz}, got {type(value)}"
         return self.clz.write_to(value, writer, context)
 
@@ -332,10 +366,10 @@ class EnumNode[TEnum: Enum, TValue: Serializable](TypeNode[TEnum]):
     clz: type[TEnum]
     value_node: TypeNode[TValue]
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         return self.clz(self.value_node.read_from(reader, context))
 
-    def write_to(self, value: TEnum, writer, context=None):
+    def write_to(self, value: TEnum, writer, context):
         return self.value_node.write_to(value.value, writer, context)
 
 
@@ -349,13 +383,29 @@ class ConvertNode[TRaw: Serializable, TValue: Any](TypeNode[TValue]):
     from_raw: Callable[[TRaw], TValue]
     to_raw: Callable[[TValue], TRaw]
 
-    def read_from(self, reader, context=None):
+    def read_from(self, reader, context):
         raw = self.raw_node.read_from(reader, context)
         return self.from_raw(raw)
 
-    def write_to(self, value: TValue, writer, context=None):
+    def write_to(self, value: TValue, writer, context):
         raw = self.to_raw(value)
         return self.raw_node.write_to(raw, writer, context)
+
+
+class VarIntNode(TypeNode[int]):
+    def read_from(self, reader, context):
+        return reader.read_varint()
+
+    def write_to(self, value, writer, context):
+        return writer.write_varint(value)
+
+
+class SVarIntNode(TypeNode[int]):
+    def read_from(self, reader, context):
+        return reader.read_signed_varint()
+
+    def write_to(self, value, writer, context):
+        return writer.write_signed_varint(value)
 
 
 __all__ = (
@@ -382,4 +432,7 @@ __all__ = (
     "ConvertNode",
     "StaticLengthNode",
     "MemberLengthNode",
+    "VarIntNode",
+    "SVarIntNode",
+    "ClassNodeMember",
 )

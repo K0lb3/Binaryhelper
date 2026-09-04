@@ -380,7 +380,7 @@ class EndianedReaderIOBase(IOBase, metaclass=abc.ABCMeta):
             if not char or char == b"\x00":
                 break
             string += char
-        return string.decode("utf-8", errors=errors)
+        return string.decode(encoding, errors=errors)
 
     def read_string(
         self,
@@ -441,6 +441,57 @@ class EndianedReaderIOBase(IOBase, metaclass=abc.ABCMeta):
         if count is None:
             count = self.read_count()
         return tuple(self.read_varint() for _ in range(count))
+
+    def read_signed_varint(self) -> int:
+        """Read a signed variable-length integer from the stream.
+
+        Returns:
+            int: The signed variable-length integer.
+        """
+        unsigned_value = self.read_varint()
+        sign_bit = unsigned_value & 1
+
+        unsigned_value >>= 1
+        if sign_bit == 1:
+            return -(unsigned_value + 1)
+
+        return unsigned_value
+
+    def read_signed_varint_array(self, count: Optional[int] = None) -> Tuple[int, ...]:
+        """Read a signed variable-length integer array from the stream.
+
+        Args:
+            count (int, optional): The number of signed variable-length integers to read. If None, use read_count to determine the length.
+
+        Returns:
+            Tuple[int, ...]: The signed variable-length integer array.
+        """
+        if count is None:
+            count = self.read_count()
+        return tuple(self.read_signed_varint() for _ in range(count))
+
+    def read_exactly(self, count: int) -> bytes:
+        """Reads exactly count bytes from the stream.
+
+        Args:
+            count (int): The number of bytes to read.
+
+        Returns:
+            bytes: The read bytes.
+        """
+        data = b""
+
+        remaining = count
+        while remaining != 0:
+            data += self.read(remaining)
+            if len(data) > count:
+                raise RuntimeError(
+                    f"Read {len(data) - count} too many bytes from input stream."
+                )
+
+            remaining = count - len(data)
+
+        return data
 
 
 class EndianedWriterIOBase(IOBase, metaclass=abc.ABCMeta):
@@ -801,10 +852,10 @@ class EndianedWriterIOBase(IOBase, metaclass=abc.ABCMeta):
         """
         result = 0
         while v > 0x7F:
-            self.write_u8((v & 0x7F) | 0x80)
+            result += self.write_u8((v & 0x7F) | 0x80)
             v >>= 7
-            result += 1
-        return self.write_u8(v)
+
+        return result + self.write_u8(v)
 
     def write_varint_array(self, v: Sequence[int], write_count: bool = True) -> int:
         """Write a variable-length integer array to the stream.
@@ -816,6 +867,33 @@ class EndianedWriterIOBase(IOBase, metaclass=abc.ABCMeta):
         if write_count:
             self.write_count(len(v))
         return sum(self.write_varint(i) for i in v)
+
+    def write_signed_varint(self, v: int) -> int:
+        """Write a signed variable-length integer to the stream.
+
+        Args:
+            v (int): The signed variable-length integer to write.
+        """
+
+        if v < 0:
+            v = ((-v - 1) << 1) | 1
+        else:
+            v = (v << 1) | 0
+
+        return self.write_varint(v)
+
+    def write_signed_varint_array(
+        self, v: Sequence[int], write_count: bool = True
+    ) -> int:
+        """Write a signed variable-length integer array to the stream.
+
+        Args:
+            v (Sequence[int]): The signed variable-length integer array to write.
+            write_count (bool, optional): Whether to write the length of the array first. Defaults to True.
+        """
+        if write_count:
+            self.write_count(len(v))
+        return sum(self.write_signed_varint(i) for i in v)
 
 
 class EndianedIOBase(EndianedReaderIOBase, EndianedWriterIOBase):
